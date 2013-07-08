@@ -1,0 +1,80 @@
+
+-- --------------------------------------------------
+-- Entity Designer DDL Script for SQL Server Compact Edition
+-- --------------------------------------------------
+-- Date Created: 07/08/2013 09:34:06
+-- Generated from EDMX file: D:\Git\StackAppBridge_Source\StackAppBridge\Model1.edmx
+-- --------------------------------------------------
+
+
+-- --------------------------------------------------
+-- Dropping existing FOREIGN KEY constraints
+-- NOTE: if the constraint does not exist, an ignorable error will be reported.
+-- --------------------------------------------------
+
+
+-- --------------------------------------------------
+-- Dropping existing tables
+-- NOTE: if the table does not exist, an ignorable error will be reported.
+-- --------------------------------------------------
+
+    DROP TABLE [Mappings];
+GO
+    DROP TABLE [Versions];
+GO
+
+-- --------------------------------------------------
+-- Creating all tables
+-- --------------------------------------------------
+
+-- Creating table 'Mappings'
+CREATE TABLE [Mappings] (
+    [PostId] int  NOT NULL,
+    [NNTPMessageNumber] bigint  NOT NULL,
+    [Id] uniqueidentifier  NOT NULL,
+    [LastEditDate] datetime  NULL,
+    [PostType] int  NOT NULL,
+    [ParentId] uniqueidentifier  NULL,
+    [LastActivityDate] datetime  NULL,
+    [Title] nvarchar(4000)  NULL
+);
+GO
+
+-- Creating table 'Versions'
+CREATE TABLE [Versions] (
+    [Id] uniqueidentifier  NOT NULL,
+    [Version1] bigint  NOT NULL
+);
+GO
+
+-- --------------------------------------------------
+-- Creating all PRIMARY KEY constraints
+-- --------------------------------------------------
+
+-- Creating primary key on [Id] in table 'Mappings'
+ALTER TABLE [Mappings]
+ADD CONSTRAINT [PK_Mappings]
+    PRIMARY KEY ([Id] );
+GO
+
+-- Creating primary key on [Id] in table 'Versions'
+ALTER TABLE [Versions]
+ADD CONSTRAINT [PK_Versions]
+    PRIMARY KEY ([Id] );
+GO
+
+
+-- CREATE UNIQUE INDEX idxMappingsMessageId ON [Mappings] (PostId);
+-- GO
+
+
+CREATE UNIQUE INDEX idxMappingsMessageNumber ON [Mappings] (NNTPMessageNumber);
+GO
+
+-- --------------------------------------------------
+-- Creating all FOREIGN KEY constraints
+-- --------------------------------------------------
+
+-- --------------------------------------------------
+-- Script has ended
+-- --------------------------------------------------
