@@ -977,7 +977,7 @@ namespace StackAppBridge
           if (con.Mappings.Any(p => p.PostId == article.MappingValue.PostId))
           {
             // TODO: Den Artikel gibt es schon...
-            Traces.WebService_TraceEvent(TraceEventType.Information, 1, "  Article-NotAdded: {0}", article.MappingValue.Id);
+            Traces.WebService_TraceEvent(TraceEventType.Information, 1, "  Article-NotAdded: {0}", article.MappingValue.PostId);
           }
           else
           {
@@ -997,6 +997,8 @@ namespace StackAppBridge
                 if (parent != null)
                 {
                   parentId = parent.Id;
+                  Traces.WebService_TraceEvent(TraceEventType.Information, 1, "  Article-ParentId-Updated: id:{0}, ({1})", 
+                    article.MappingValue.PostId, parentId.Value);
                 }
               }
               if (parentId != null)
@@ -1011,8 +1013,12 @@ namespace StackAppBridge
             }
             article.Number = ++maxNr;
             article.MappingValue.NNTPMessageNumber = article.Number;
-            con.Mappings.AddObject(article.MappingValue);
 
+            
+            Traces.WebService_TraceEvent(TraceEventType.Information, 1, "Adding to DB: id:{0} ({1}), NNTP#: {2}",
+              article.MappingValue.PostId, article.MappingValue.Id, article.MappingValue.NNTPMessageNumber);
+
+            con.Mappings.AddObject(article.MappingValue);
             articles.Add(article);
           }
         }
@@ -1058,13 +1064,14 @@ namespace StackAppBridge
                                       tags:group.Tags,
                                       site_:group.Site,
                                       //fromDate: lastActivityFrom);  // "fromDate" is always related to "CreationDate"!!!
-                                      min_: (long?)Stacky.DateHelper.ToUnixTime(lastActivityFrom.Value));  // And "min" is always related to "sort" value!
+                                      min_: lastActivityFrom.HasValue ? 
+                                      (long?)Stacky.DateHelper.ToUnixTime(lastActivityFrom.Value)
+                                      : null);  // And "min" is always related to "sort" value!
 
       hasMore = res.HasMore;
 
       foreach (Question question in res)
       {
-        Traces.WebService_TraceEvent(TraceEventType.Information, 1, "Question: {0} ({1})", question.Id, question.LastActivityDate.ToString("s"));
 
         // First, create the mapping-Entry:
         var map = new Mapping();
@@ -1077,6 +1084,13 @@ namespace StackAppBridge
         else
           map.LastActivityDate = question.CreationDate;
 
+        Traces.WebService_TraceEvent(TraceEventType.Information, 1, "Question: {0} ({1})", 
+          question.Id, 
+          map.Id
+          //question.LastActivityDate.ToString("s")
+          );
+
+
         var q = new ForumArticle(group, map, question);
         result.Add(q);
 
@@ -1085,7 +1099,6 @@ namespace StackAppBridge
         {
           foreach (Comment comment in question.Comments)
           {
-            Traces.WebService_TraceEvent(TraceEventType.Information, 1, "  Comment: qid:{0} {1}", question.Id, comment.Id);
             // First, create the mapping-Entry:
             var mapc = new Mapping();
             mapc.PostId = comment.Id;
@@ -1094,6 +1107,9 @@ namespace StackAppBridge
             //mapc.ParentId = map.Id;
             mapc.PostType = PostTypeComment;
             mapc.Title = question.Title;
+
+            Traces.WebService_TraceEvent(TraceEventType.Information, 1, "  Comment: qid:{0} {1} ({2})", 
+              question.Id, comment.Id, mapc.Id);
 
             var qc = new ForumArticle(group, mapc, comment);
             result.Add(qc);
@@ -1105,7 +1121,6 @@ namespace StackAppBridge
         {
           foreach (Answer answer in question.Answers)
           {
-            Traces.WebService_TraceEvent(TraceEventType.Information, 1, "  Answer: qid:{0} {1} ({2})", question.Id, answer.Id, answer.LastActivityDate.ToString("s"));
             // First, create the mapping-Entry:
             var mapa = new Mapping();
             mapa.PostId = answer.Id;
@@ -1115,6 +1130,12 @@ namespace StackAppBridge
             mapa.PostType = PostTypeAnswer;
             mapa.Title = question.Title;
 
+            Traces.WebService_TraceEvent(TraceEventType.Information, 1, "  Answer: qid:{0} {1} ({2})", 
+              question.Id, answer.Id, 
+              mapa.Id
+              //answer.LastActivityDate.ToString("s")
+              );
+
             var ac = new ForumArticle(group, mapa, answer);
             result.Add(ac);
 
@@ -1123,14 +1144,17 @@ namespace StackAppBridge
             {
               foreach (Comment comment2 in answer.Comments)
               {
-                Traces.WebService_TraceEvent(TraceEventType.Information, 1, "    Comment: qid:{0} aid:{1} {2}", question.Id, answer.Id, comment2.Id);
                 // First, create the mapping-Entry:
                 var mapc2 = new Mapping();
                 mapc2.PostId = comment2.Id;
                 mapc2.Id = Guid.NewGuid();
-                mapc2.ParentId = mapa.Id;
+                mapc2.ParentPostId = mapa.PostId;
+                //mapc2.ParentId = mapa.Id;
                 mapc2.PostType = PostTypeComment;
                 mapc2.Title = question.Title;
+
+                Traces.WebService_TraceEvent(TraceEventType.Information, 1, "    Comment: qid:{0} aid:{1} {2} ({3})",
+                  question.Id, answer.Id, comment2.Id, mapc2.Id);
 
                 var qac = new ForumArticle(group, mapc2, comment2);
                 result.Add(qac);
