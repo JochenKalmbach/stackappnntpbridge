@@ -1,0 +1,45 @@
+<!-- thumbnail: http://example.com/some-image.png -->
+<!-- version: 1.1 -->
+<!-- tag: app -->
+<!-- excerpt: With this NNTP Bridge you can follow all posts of StackOverflow (and other StackExchange sited) very easily. Each question will be shown as one thread with all tags, the comments, answers and comments to this answers -->
+
+##Screenshot
+
+![StackApp NNTP bridge](http://stackappnntpbridge.kalmbach.eu/newsreader02.png)
+
+##About
+
+With this NNTP Bridge you can follow all posts of StackOverflow (and other StackExchange sited) very easily. Each question will be shown as one thread with all tags, the comments, answers and comments to this answers.
+It might help to get a better overview of all threads withing a specific tag. Also it might help if you are used to newsgroups.
+This application works as an NNTP-Server which provides the posts to any newsreader.
+Currently it provides only **read-only** access to the posts. Later it is planned to implement some write access.
+
+###License
+
+It is released under an Open Source license (Ms-PL): <https://stackappnntpbridge.codeplex.com/license> and the source is stored under git.
+
+###Download
+
+The project is located on codeplex. The latest version can be found here: <https://stackappnntpbridge.codeplex.com/>
+
+
+###Platform
+
+This application runs under Windows XP an later. It uses .NET4 runtime and the SQL CE 3.5 runtime (for more informations, see the download). 
+
+##Contact
+
+You can contact me via the [codeplex site][1].
+
+##Code
+
+The code was written in C# (.net 4).
+
+The latest source code can be found via git: <https://stackappnntpbridge.codeplex.com/SourceControl/latest>
+
+Everyone is welcome to contribute to this project.
+
+###Future improvements
+
+
+  [1]: https://www.codeplex.com/site/users/view/jkalmbach
