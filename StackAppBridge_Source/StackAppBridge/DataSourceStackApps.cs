@@ -212,13 +212,13 @@ namespace StackAppBridge
       if (g == null)
         throw new ApplicationException("No group provided");
 
-      Guid? id = ForumArticle.IdToGuid(articleId);
+      long? id = ForumArticle.IdToPostId(articleId);
       if (id == null) return null;
 
       return GetArticleByIdInternal(g, id.Value);
     }
 
-    private ForumArticle GetArticleByIdInternal(ForumNewsgroup g, Guid id)
+    private ForumArticle GetArticleByIdInternal(ForumNewsgroup g, long postId)
     {
       if (g == null)
       {
@@ -233,13 +233,13 @@ namespace StackAppBridge
           foreach (var ar in g.Articles.Values)
           {
             var fa = ar as ForumArticle;
-            if ((fa != null) && (fa.MappingValue.Id == id))
+            if ((fa != null) && (fa.MappingValue.PostId == postId))
               return fa;
           }
         }
       }
 
-      ForumArticle a = _management.GetMessageById(g, id);
+      ForumArticle a = _management.GetMessageById(g, postId);
       if (a == null) return null;
 
       ConvertNewArticleFromWebService(a);
@@ -596,7 +596,7 @@ namespace StackAppBridge
 #if DEBUG
         _question = question;
 #endif
-        Id = GuidToId(mapping.Id);
+        Id = PostIdToId(g.Site, mapping.PostId, mapping.CreatedDate);
 
         MappingValue = mapping;
 
@@ -665,7 +665,7 @@ namespace StackAppBridge
 #if DEBUG
         _comment = comment;
 #endif
-        Id = GuidToId(mapping.Id);
+        Id = PostIdToId(g.Site, mapping.PostId, mapping.CreatedDate);
 
         MappingValue = mapping;
 
@@ -691,8 +691,8 @@ namespace StackAppBridge
           sub = "[COMMENT] ";
         }
         Subject = "Re: " + sub + mapping.Title;
-        if (mapping.ParentId != null)
-          References = GuidToId(mapping.ParentId.Value);
+        if (mapping.ParentPostId != null)
+          References = PostIdToId(g.Site, mapping.ParentPostId.Value, mapping.ParentCreatedDate);
 
         Newsgroups = g.GroupName;
         ParentNewsgroup = Newsgroups;
@@ -715,13 +715,13 @@ namespace StackAppBridge
 #if DEBUG
         _answer = answer;
 #endif
-        Id = GuidToId(mapping.Id);
+        Id = PostIdToId(g.Site, mapping.PostId, mapping.CreatedDate);
 
         MappingValue = mapping;
 
         DateTime dt = answer.CreationDate;
-        if (answer.LastActivityDate != DateTime.MinValue)
-          dt = answer.LastActivityDate;
+        //if (answer.LastActivityDate != DateTime.MinValue)
+        //  dt = answer.LastActivityDate;
         Date = string.Format("{0} +0000", dt.ToString("ddd, d MMM yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture));
 
         string author = null;
@@ -742,8 +742,8 @@ namespace StackAppBridge
         }
 
         Subject = "Re: " + sub + mapping.Title;
-        if (mapping.ParentId != null)
-          References = GuidToId(mapping.ParentId.Value);
+        if (mapping.ParentPostId != null)
+          References = PostIdToId(g.Site, mapping.ParentPostId.Value, mapping.ParentCreatedDate);
 
         Newsgroups = g.GroupName;
         ParentNewsgroup = Newsgroups;
@@ -766,32 +766,42 @@ namespace StackAppBridge
       private Answer _answer;
 #endif
 
-      internal void UpdateParentId()
-      {
-        if (MappingValue.ParentId != null)
-          References = GuidToId(MappingValue.ParentId.Value);
-      }
+      //internal void UpdateParentId()
+      //{
+      //  if (MappingValue.ParentId != null)
+      //    References = GuidToId(MappingValue.ParentId.Value);
+      //}
 
       public Mapping MappingValue;
 
+
       // The "-" is a valid character in the messageId field:
       // http://www.w3.org/Protocols/rfc1036/rfc1036.html#z2
-      public static string GuidToId(Guid id)
+      public static string PostIdToId(string server, long postId, DateTime? createdDate)
       {
-        return "<" + id.ToString("D", System.Globalization.CultureInfo.InvariantCulture) + "$stackappnntpbridge.codeplex.com>";
+        string createdDateStr = createdDate == null
+                              ? "0"
+                              : createdDate.Value.ToString("yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture);
+        return "<" 
+          + postId.ToString(System.Globalization.CultureInfo.InvariantCulture) 
+          + "-"
+          + server
+          + "-"
+          + createdDateStr
+          + "@stackappnntpbridge.codeplex.com>";
       }
 
 
-        public static Guid? IdToGuid(string id)
+        public static long? IdToPostId(string id)
         {
           if (id == null) return null;
           if (id.StartsWith("<") == false) return null;
           id = id.Trim('<', '>');
-          var parts = id.Split('$');
+          var parts = id.Split('-', '@');
 
           // The first part is always the id:
-          Guid idVal;
-          if (Guid.TryParse(parts[0], out idVal) == false)
+          long idVal;
+          if (long.TryParse(parts[0], out idVal) == false)
             return null;
 
           return idVal;
@@ -1004,7 +1014,7 @@ namespace StackAppBridge
               if (parentId != null)
               {
                 article.MappingValue.ParentId = parentId.Value;
-                article.UpdateParentId();
+                //article.UpdateParentId();
               }
               else
               {
@@ -1079,6 +1089,7 @@ namespace StackAppBridge
         map.Id = Guid.NewGuid();
         map.PostType = PostTypeQuestion;
         map.Title = question.Title;
+        map.CreatedDate = question.CreationDate;
         if (question.LastActivityDate != DateTime.MinValue)
           map.LastActivityDate = question.LastActivityDate;
         else
@@ -1104,9 +1115,11 @@ namespace StackAppBridge
             mapc.PostId = comment.Id;
             mapc.Id = Guid.NewGuid();
             mapc.ParentPostId = map.PostId;
+            mapc.ParentCreatedDate = map.CreatedDate;
             //mapc.ParentId = map.Id;
             mapc.PostType = PostTypeComment;
             mapc.Title = question.Title;
+            mapc.CreatedDate = comment.CreationDate;
 
             Traces.WebService_TraceEvent(TraceEventType.Information, 1, "  Comment: qid:{0} {1} ({2})", 
               question.Id, comment.Id, mapc.Id);
@@ -1117,7 +1130,7 @@ namespace StackAppBridge
         }
 
         // Now also add all answers
-        if (question.Comments != null)
+        if (question.Answers != null)
         {
           foreach (Answer answer in question.Answers)
           {
@@ -1126,9 +1139,11 @@ namespace StackAppBridge
             mapa.PostId = answer.Id;
             mapa.Id = Guid.NewGuid();
             mapa.ParentPostId = map.PostId;
+            mapa.ParentCreatedDate = map.CreatedDate;
             //mapa.ParentId = map.Id;
             mapa.PostType = PostTypeAnswer;
             mapa.Title = question.Title;
+            mapa.CreatedDate = answer.CreationDate;
 
             Traces.WebService_TraceEvent(TraceEventType.Information, 1, "  Answer: qid:{0} {1} ({2})", 
               question.Id, answer.Id, 
@@ -1149,9 +1164,11 @@ namespace StackAppBridge
                 mapc2.PostId = comment2.Id;
                 mapc2.Id = Guid.NewGuid();
                 mapc2.ParentPostId = mapa.PostId;
+                mapc2.ParentCreatedDate = mapa.CreatedDate;
                 //mapc2.ParentId = mapa.Id;
                 mapc2.PostType = PostTypeComment;
                 mapc2.Title = question.Title;
+                mapc2.CreatedDate = comment2.CreationDate;
 
                 Traces.WebService_TraceEvent(TraceEventType.Information, 1, "    Comment: qid:{0} aid:{1} {2} ({3})",
                   question.Id, answer.Id, comment2.Id, mapc2.Id);
@@ -1167,14 +1184,14 @@ namespace StackAppBridge
       return result;
     }
 
-    public ForumArticle GetMessageById(ForumNewsgroup forumNewsgroup, Guid id)
+    public ForumArticle GetMessageById(ForumNewsgroup forumNewsgroup, long postId)
     {
       Mapping map;
       lock (forumNewsgroup)
       {
         using (var con = _db.CreateConnection(forumNewsgroup.GroupName))
         {
-            map = con.Mappings.FirstOrDefault(p => p.Id == id);
+            map = con.Mappings.FirstOrDefault(p => p.PostId == postId);
         }
       }
       if (map == null)
@@ -1203,11 +1220,12 @@ namespace StackAppBridge
 
     private ForumArticle InternalGetMsgById(ForumNewsgroup group, Mapping map)
     {
+      int postId = (int) map.PostId;
       switch (map.PostType)
       {
         case PostTypeQuestion:
           {
-            IPagedList<Question> result = group.StackyClient.GetQuestions(new[] {map.PostId}, _filter: QuestionFilterNameWithBody, site_: group.Site);
+            IPagedList<Question> result = group.StackyClient.GetQuestions(new[] { postId }, _filter: QuestionFilterNameWithBody, site_: group.Site);
             var q = result.FirstOrDefault();
             Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetQuestion: id:{0}", map.PostId);
             if (q != null)
@@ -1218,7 +1236,7 @@ namespace StackAppBridge
           }
         case PostTypeAnswer:
           {
-            IPagedList<Answer> result = group.StackyClient.GetAnswers(new[] {map.PostId}, filter_: QuestionFilterNameWithBody, site_: group.Site);
+            IPagedList<Answer> result = group.StackyClient.GetAnswers(new[] { postId }, filter_: QuestionFilterNameWithBody, site_: group.Site);
             var a = result.FirstOrDefault();
             Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetAnswer: id:{0}", map.PostId);
             if (a != null)
@@ -1229,7 +1247,7 @@ namespace StackAppBridge
           }
         case PostTypeComment:
           {
-            IPagedList<Comment> result = group.StackyClient.GetComments(new[] { map.PostId }, filter_: QuestionFilterNameWithBody, site_: group.Site);
+            IPagedList<Comment> result = group.StackyClient.GetComments(new[] { postId }, filter_: QuestionFilterNameWithBody, site_: group.Site);
             var c = result.FirstOrDefault();
             Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetComment: id:{0}", map.PostId);
             if (c != null)

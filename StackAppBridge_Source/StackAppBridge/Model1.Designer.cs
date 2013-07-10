@@ -142,7 +142,7 @@ namespace StackAppBridge
         /// <param name="nNTPMessageNumber">Initial value of the NNTPMessageNumber property.</param>
         /// <param name="id">Initial value of the Id property.</param>
         /// <param name="postType">Initial value of the PostType property.</param>
-        public static Mapping CreateMapping(global::System.Int32 postId, global::System.Int64 nNTPMessageNumber, global::System.Guid id, global::System.Int32 postType)
+        public static Mapping CreateMapping(global::System.Int64 postId, global::System.Int64 nNTPMessageNumber, global::System.Guid id, global::System.Int32 postType)
         {
             Mapping mapping = new Mapping();
             mapping.PostId = postId;
@@ -161,7 +161,7 @@ namespace StackAppBridge
         /// </summary>
         [EdmScalarPropertyAttribute(EntityKeyProperty=false, IsNullable=false)]
         [DataMemberAttribute()]
-        public global::System.Int32 PostId
+        public global::System.Int64 PostId
         {
             get
             {
@@ -176,8 +176,8 @@ namespace StackAppBridge
                 OnPostIdChanged();
             }
         }
-        private global::System.Int32 _PostId;
-        partial void OnPostIdChanging(global::System.Int32 value);
+        private global::System.Int64 _PostId;
+        partial void OnPostIdChanging(global::System.Int64 value);
         partial void OnPostIdChanged();
     
         /// <summary>
@@ -236,24 +236,24 @@ namespace StackAppBridge
         /// </summary>
         [EdmScalarPropertyAttribute(EntityKeyProperty=false, IsNullable=true)]
         [DataMemberAttribute()]
-        public Nullable<global::System.DateTime> LastEditDate
+        public Nullable<global::System.DateTime> CreatedDate
         {
             get
             {
-                return _LastEditDate;
+                return _CreatedDate;
             }
             set
             {
-                OnLastEditDateChanging(value);
-                ReportPropertyChanging("LastEditDate");
-                _LastEditDate = StructuralObject.SetValidValue(value);
-                ReportPropertyChanged("LastEditDate");
-                OnLastEditDateChanged();
+                OnCreatedDateChanging(value);
+                ReportPropertyChanging("CreatedDate");
+                _CreatedDate = StructuralObject.SetValidValue(value);
+                ReportPropertyChanged("CreatedDate");
+                OnCreatedDateChanged();
             }
         }
-        private Nullable<global::System.DateTime> _LastEditDate;
-        partial void OnLastEditDateChanging(Nullable<global::System.DateTime> value);
-        partial void OnLastEditDateChanged();
+        private Nullable<global::System.DateTime> _CreatedDate;
+        partial void OnCreatedDateChanging(Nullable<global::System.DateTime> value);
+        partial void OnCreatedDateChanged();
     
         /// <summary>
         /// No Metadata Documentation available.
@@ -350,6 +350,78 @@ namespace StackAppBridge
         private global::System.String _Title;
         partial void OnTitleChanging(global::System.String value);
         partial void OnTitleChanged();
+    
+        /// <summary>
+        /// No Metadata Documentation available.
+        /// </summary>
+        [EdmScalarPropertyAttribute(EntityKeyProperty=false, IsNullable=true)]
+        [DataMemberAttribute()]
+        public Nullable<global::System.Int64> ParentPostId
+        {
+            get
+            {
+                return _ParentPostId;
+            }
+            set
+            {
+                OnParentPostIdChanging(value);
+                ReportPropertyChanging("ParentPostId");
+                _ParentPostId = StructuralObject.SetValidValue(value);
+                ReportPropertyChanged("ParentPostId");
+                OnParentPostIdChanged();
+            }
+        }
+        private Nullable<global::System.Int64> _ParentPostId;
+        partial void OnParentPostIdChanging(Nullable<global::System.Int64> value);
+        partial void OnParentPostIdChanged();
+    
+        /// <summary>
+        /// No Metadata Documentation available.
+        /// </summary>
+        [EdmScalarPropertyAttribute(EntityKeyProperty=false, IsNullable=true)]
+        [DataMemberAttribute()]
+        public Nullable<global::System.DateTime> ParentCreatedDate
+        {
+            get
+            {
+                return _ParentCreatedDate;
+            }
+            set
+            {
+                OnParentCreatedDateChanging(value);
+                ReportPropertyChanging("ParentCreatedDate");
+                _ParentCreatedDate = StructuralObject.SetValidValue(value);
+                ReportPropertyChanged("ParentCreatedDate");
+                OnParentCreatedDateChanged();
+            }
+        }
+        private Nullable<global::System.DateTime> _ParentCreatedDate;
+        partial void OnParentCreatedDateChanging(Nullable<global::System.DateTime> value);
+        partial void OnParentCreatedDateChanged();
+    
+        /// <summary>
+        /// No Metadata Documentation available.
+        /// </summary>
+        [EdmScalarPropertyAttribute(EntityKeyProperty=false, IsNullable=true)]
+        [DataMemberAttribute()]
+        public global::System.String Info
+        {
+            get
+            {
+                return _Info;
+            }
+            set
+            {
+                OnInfoChanging(value);
+                ReportPropertyChanging("Info");
+                _Info = StructuralObject.SetValidValue(value, true);
+                ReportPropertyChanged("Info");
+                OnInfoChanged();
+            }
+        }
+        private global::System.String _Info;
+        partial void OnInfoChanging(global::System.String value);
+        partial void OnInfoChanged();
 
         #endregion
 

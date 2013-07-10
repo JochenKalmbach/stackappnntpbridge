@@ -13,14 +13,17 @@
     <Key>
       <PropertyRef Name="Id" />
     </Key>
-    <Property Name="PostId" Type="int" Nullable="false" />
+    <Property Name="PostId" Type="bigint" Nullable="false" />
     <Property Name="NNTPMessageNumber" Type="bigint" Nullable="false" />
     <Property Name="Id" Type="uniqueidentifier" Nullable="false" />
-    <Property Name="LastEditDate" Type="datetime" Nullable="true" />
+    <Property Name="CreatedDate" Type="datetime" Nullable="true" />
     <Property Name="PostType" Type="int" Nullable="false" />
     <Property Name="ParentId" Type="uniqueidentifier" Nullable="true" />
     <Property Name="LastActivityDate" Type="datetime" Nullable="true" />
     <Property Name="Title" Type="nvarchar" Nullable="true" />
+    <Property Name="ParentPostId" Type="bigint" Nullable="true" />
+    <Property Name="ParentCreatedDate" Type="datetime" Nullable="true" />
+    <Property Name="Info" Type="nvarchar" Nullable="true" />
   </EntityType>
   <EntityType Name="Versions">
     <Key>
@@ -41,14 +44,17 @@
           <Key>
             <PropertyRef Name="Id" />
           </Key>
-          <Property Name="PostId" Type="Int32" Nullable="false" />
+          <Property Name="PostId" Type="Int64" Nullable="false" />
           <Property Name="NNTPMessageNumber" Type="Int64" Nullable="false" />
           <Property Name="Id" Type="Guid" Nullable="false" />
-          <Property Name="LastEditDate" Type="DateTime" />
+          <Property Name="CreatedDate" Type="DateTime" Nullable="true" />
           <Property Type="Int32" Name="PostType" Nullable="false" />
           <Property Type="Guid" Name="ParentId" Nullable="true" />
           <Property Type="DateTime" Name="LastActivityDate" Nullable="true" />
           <Property Type="String" Name="Title" Nullable="true" />
+          <Property Type="Int64" Name="ParentPostId" Nullable="true" />
+          <Property Type="DateTime" Name="ParentCreatedDate" Nullable="true" />
+          <Property Type="String" Name="Info" Nullable="true" />
         </EntityType>
         <EntityType Name="Version">
           <Key>
@@ -69,11 +75,14 @@
           <ScalarProperty Name="Id" ColumnName="Id" />
           <ScalarProperty Name="PostId" ColumnName="PostId" />
           <ScalarProperty Name="NNTPMessageNumber" ColumnName="NNTPMessageNumber" />
-          <ScalarProperty Name="LastEditDate" ColumnName="LastEditDate" />
+          <ScalarProperty Name="CreatedDate" ColumnName="CreatedDate" />
           <ScalarProperty Name="PostType" ColumnName="PostType" />
           <ScalarProperty Name="ParentId" ColumnName="ParentId" />
           <ScalarProperty Name="LastActivityDate" ColumnName="LastActivityDate" />
           <ScalarProperty Name="Title" ColumnName="Title" />
+          <ScalarProperty Name="ParentPostId" ColumnName="ParentPostId" />
+          <ScalarProperty Name="ParentCreatedDate" ColumnName="ParentCreatedDate" />
+          <ScalarProperty Name="Info" ColumnName="Info" />
         </MappingFragment>
       </EntityTypeMapping>
     </EntitySetMapping>
@@ -105,7 +114,7 @@
     <!-- Diagram content (shape and connector positions) -->
     <Diagrams>
       <Diagram Name="Model1">
-        <EntityTypeShape EntityType="NewsgroupsModel.Mapping" Width="1.5" PointX="0.75" PointY="0.75" Height="2.5571907552083331" IsExpanded="true" />
+        <EntityTypeShape EntityType="NewsgroupsModel.Mapping" Width="1.5" PointX="0.75" PointY="0.75" Height="3.1340950520833331" IsExpanded="true" />
         <EntityTypeShape EntityType="NewsgroupsModel.Version" Width="1.5" PointX="2.75" PointY="0.75" Height="1.4033821614583335" IsExpanded="true" />
       </Diagram>
     </Diagrams>

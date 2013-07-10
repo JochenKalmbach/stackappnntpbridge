@@ -152,7 +152,7 @@ namespace StackAppBridge
   public partial class Mapping
   {
 
-    public int ParentPostId;
+    //public int ParentPostId;
     //public DateTime? LastEditDateUtc
     //{
     //  get

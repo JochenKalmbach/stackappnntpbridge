@@ -185,6 +185,7 @@
       <Generator>EntityModelCodeGenerator</Generator>
       <LastGenOutput>Model1.Designer.cs</LastGenOutput>
     </EntityDeploy>
+    <None Include="App.Config" />
     <None Include="Model1.edmx.sqlce" />
     <None Include="Properties\DataSources\NewsgroupsEntities.datasource" />
     <None Include="Properties\Settings.settings">

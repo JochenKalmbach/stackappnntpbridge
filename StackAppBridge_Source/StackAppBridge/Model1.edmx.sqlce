@@ -2,8 +2,8 @@
 -- --------------------------------------------------
 -- Entity Designer DDL Script for SQL Server Compact Edition
 -- --------------------------------------------------
--- Date Created: 07/08/2013 09:34:06
--- Generated from EDMX file: D:\Git\StackAppBridge_Source\StackAppBridge\Model1.edmx
+-- Date Created: 07/10/2013 20:33:41
+-- Generated from EDMX file: D:\Git\stackappnntpbridge\StackAppBridge_Source\StackAppBridge\Model1.edmx
 -- --------------------------------------------------
 
 
@@ -29,14 +29,17 @@ GO
 
 -- Creating table 'Mappings'
 CREATE TABLE [Mappings] (
-    [PostId] int  NOT NULL,
+    [PostId] bigint  NOT NULL,
     [NNTPMessageNumber] bigint  NOT NULL,
     [Id] uniqueidentifier  NOT NULL,
-    [LastEditDate] datetime  NULL,
+    [CreatedDate] datetime  NULL,
     [PostType] int  NOT NULL,
     [ParentId] uniqueidentifier  NULL,
     [LastActivityDate] datetime  NULL,
-    [Title] nvarchar(4000)  NULL
+    [Title] nvarchar(4000)  NULL,
+    [ParentPostId] bigint  NULL,
+    [ParentCreatedDate] datetime  NULL,
+    [Info] nvarchar(4000)  NULL
 );
 GO
 
@@ -63,12 +66,10 @@ ADD CONSTRAINT [PK_Versions]
     PRIMARY KEY ([Id] );
 GO
 
-
--- CREATE UNIQUE INDEX idxMappingsMessageId ON [Mappings] (PostId);
--- GO
-
-
 CREATE UNIQUE INDEX idxMappingsMessageNumber ON [Mappings] (NNTPMessageNumber);
+GO
+
+CREATE INDEX idxMappingsPostId ON [Mappings] (PostId);
 GO
 
 -- --------------------------------------------------
