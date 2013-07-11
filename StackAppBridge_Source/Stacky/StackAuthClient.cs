@@ -33,7 +33,7 @@ namespace Stacky
             where T : new()
         {
             if (httpResponse.Error != null && String.IsNullOrEmpty(httpResponse.Body))
-                throw new ApiException("Error retrieving url", null, httpResponse.Error, httpResponse.Url);
+              throw new ApiException("Error retrieving url", null, httpResponse.Error, httpResponse.Url, httpResponse.Body);
 
             var response = Protocol.GetResponse<T>(httpResponse.Body);
             if (response.Error != null)

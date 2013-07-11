@@ -53,7 +53,8 @@ namespace Stacky
             if (currentPage == null)
                 return false;
 
-            if (currentPage.TotalItems > 0)
+            //if (currentPage.TotalItems > 0)
+          if (currentPage.HasMore)
             {
                 currentItem = currentPage.ElementAt(CurrentPageItemIndex++);
                 ++CurrentItemIndex;

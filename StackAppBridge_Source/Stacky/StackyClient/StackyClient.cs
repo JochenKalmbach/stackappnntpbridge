@@ -53,23 +53,23 @@ namespace Stacky
             where T : new()
         {
             if (httpResponse.Error != null && String.IsNullOrEmpty(httpResponse.Body))
-                throw new ApiException("Error retrieving url", null, httpResponse.Error, httpResponse.Url);
+              throw new ApiException("Error retrieving url", null, httpResponse.Error, httpResponse.Url, httpResponse.Body);
 
             RemainingRequests = httpResponse.RemainingRequests;
             MaxRequests = httpResponse.MaxRequests;
 
+          IResponse<T> response = null;
           try
           {
-            var response = Protocol.GetResponse<T>(httpResponse.Body);
-            if (response.Error != null)
-              throw new ApiException(response.Error);
-            return response.Data;
+            response = Protocol.GetResponse<T>(httpResponse.Body);
           }
-          catch (Exception)
+          catch (Exception exp)
           {
-            System.Diagnostics.Debug.WriteLine(httpResponse.Body);
-            throw;
+            throw new ApiException(exp, httpResponse.Body);
           }
+          if (response.Error != null)
+            throw new ApiException(response.Error, httpResponse.Body);
+          return response.Data;
         }
 
         public HttpResponse GetResponse(string method, string[] urlArguments, Dictionary<string, string> queryStringArguments)

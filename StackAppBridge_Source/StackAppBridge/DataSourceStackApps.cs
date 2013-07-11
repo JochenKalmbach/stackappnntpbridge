@@ -84,9 +84,17 @@ namespace StackAppBridge
           return true;
         }
 
+        // Add special "Inbox" newsgroup
+        AddStackExchangeInboxGroup(GroupList);
+
         // Use the newsgroup from the config
         foreach (NewsgroupConfigEntry entry in _NewsgroupConfig.Newsgroups)
         {
+          if (GroupList.ContainsKey(entry.Name))
+          {
+            // Ignore group with already existing name...
+            continue;
+          }
 
           var g = new ForumNewsgroup(entry);
 
@@ -118,6 +126,17 @@ namespace StackAppBridge
       } // lock
 
       return res;
+    }
+
+    private void AddStackExchangeInboxGroup(Dictionary<string, Newsgroup> groupList)
+    {
+      // TODO: Support of Inbox-Items...
+      if (string.IsNullOrEmpty(_accessToken))
+        return;
+
+      // INFO: This needs to have the "read_inbox" scope on the AuthWindow!
+
+      //throw new NotImplementedException();
     }
 
     /// <summary>
@@ -758,6 +777,16 @@ namespace StackAppBridge
         mhStr.AppendFormat("<br/>Link: <a href='{0}'>{0}</a>", answer.Link);
         if (answer.Score != 0)
           mhStr.AppendFormat("<br/>Score#: {0}", answer.Score);
+        if (answer.Accepted)
+          mhStr.Append("<br/><strong>Accepted</strong>");
+        if (answer.UpVoteCount != 0)
+          mhStr.AppendFormat("<br/>UpVote#: {0}", answer.UpVoteCount);
+        if (answer.DownVoteCount != 0)
+          mhStr.AppendFormat("<br/>DownVote#: {0}", answer.DownVoteCount);
+        if (answer.FavoriteCount != 0)
+          mhStr.AppendFormat("<br/>Favorite#: {0}", answer.FavoriteCount);
+        if (answer.LockedDate != DateTime.MinValue)
+          mhStr.AppendFormat("<br/>Locked: {0:yyyy-MM-dd HH:mm:ss}", answer.LockedDate);
         mhStr.Append("<br/>-----<br/>");
 
         Body = answer.Body + mhStr;
@@ -1057,6 +1086,18 @@ namespace StackAppBridge
       }
     }
 
+    void LogPageResult<T>(IPagedList<T> res, string groupName)
+    {
+      if (res == null)
+        return;
+      Traces.WebService_TraceEvent(
+        TraceEventType.Information,
+        1,
+        "Response: CurrentPage: {0}, PageSize: {1}, HasMore: {2}, BackOff: {3}, QuotaMax: {4}, QuotaRemaining: {5} ({6})",
+        res.CurrentPage, res.PageSize, res.HasMore, res.BackOff, res.QuotaMax, res.QuotaRemaining, groupName);
+    }
+
+
     // Default + answer.comments;answer.link;answer.body;question.answers;question.comments;question.body;comment.link;comment.body
     internal const string QuestionFilterNameWithBody = "!0ZPuz7ZFJF)YU8rYJHAppml3Z";
 
@@ -1074,17 +1115,33 @@ namespace StackAppBridge
 
       Traces.WebService_TraceEvent(TraceEventType.Information, 1, "Update questions ({1}): {0}", lastActivityFrom == null ? "(null)" : lastActivityFrom.Value.ToString("s"), group.GroupName);
 
-      IPagedList<Question> res = group.StackyClient.GetQuestions(QuestionSort.Activity, SortDirection.Descending, page, pageSize,
-                                      filter: QuestionFilterNameWithBody,
-                                      tags:group.Tags,
-                                      site_:group.Site,
-                                      //fromDate: lastActivityFrom);  // "fromDate" is always related to "CreationDate"!!!
-                                      min_: lastActivityFrom.HasValue ? 
-                                      (long?)Stacky.DateHelper.ToUnixTime(lastActivityFrom.Value) : null,
-                                      accessToken: _accessToken
-                                      );  // And "min" is always related to "sort" value!
+      IPagedList<Question> res = null;
+      try
+      {
+        res = group.StackyClient.GetQuestions(QuestionSort.Activity, SortDirection.Descending, page, pageSize,
+                                        filter: QuestionFilterNameWithBody,
+                                        tags: group.Tags,
+                                        site_: group.Site,
+                                        //fromDate: lastActivityFrom);  // "fromDate" is always related to "CreationDate"!!!
+                                        min_: lastActivityFrom.HasValue ?
+                                        (long?)Stacky.DateHelper.ToUnixTime(lastActivityFrom.Value) : null,
+                                        accessToken: _accessToken
+                                        );  // And "min" is always related to "sort" value!
+
+      }
+      catch (ApiException exp)
+      {
+        Traces.WebService_TraceEvent(
+          TraceEventType.Error, 1, "Exception of GetQuestions: Exception: {0}, Body: {1}",
+          NNTPServer.Traces.ExceptionToString(exp),
+          exp.Body);
+        throw;
+      }
+
 
       hasMore = res.HasMore;
+
+      LogPageResult(res, group.GroupName);
 
       foreach (Question question in res)
       {
@@ -1232,6 +1289,7 @@ namespace StackAppBridge
         case PostTypeQuestion:
           {
             IPagedList<Question> result = group.StackyClient.GetQuestions(new[] { postId }, _filter: QuestionFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
+            LogPageResult(result, group.GroupName);
             var q = result.FirstOrDefault();
             Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetQuestion: id:{0}", map.PostId);
             if (q != null)
@@ -1243,6 +1301,7 @@ namespace StackAppBridge
         case PostTypeAnswer:
           {
             IPagedList<Answer> result = group.StackyClient.GetAnswers(new[] { postId }, filter_: QuestionFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
+            LogPageResult(result, group.GroupName);
             var a = result.FirstOrDefault();
             Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetAnswer: id:{0}", map.PostId);
             if (a != null)
@@ -1254,6 +1313,7 @@ namespace StackAppBridge
         case PostTypeComment:
           {
             IPagedList<Comment> result = group.StackyClient.GetComments(new[] { postId }, filter_: QuestionFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
+            LogPageResult(result, group.GroupName);
             var c = result.FirstOrDefault();
             Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetComment: id:{0}", map.PostId);
             if (c != null)

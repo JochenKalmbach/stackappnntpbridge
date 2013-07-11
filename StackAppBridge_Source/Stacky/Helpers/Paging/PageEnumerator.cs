@@ -47,7 +47,8 @@ namespace Stacky
             }
             if (current == null)
                 return false;
-            if (current.TotalItems > 0)
+          if (current.HasMore)
+            //if (current.TotalItems > 0)
             {
                 return true;
             }
