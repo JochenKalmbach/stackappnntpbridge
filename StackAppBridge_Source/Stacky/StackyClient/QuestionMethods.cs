@@ -7,10 +7,10 @@ namespace Stacky
 {
     public partial class StackyClient
     {
-      public virtual IPagedList<Question> GetQuestions(QuestionSort sortBy = QuestionSort.Activity, SortDirection sortDirection = SortDirection.Descending, int? page = null, int? pageSize = null, DateTime? fromDate = null, DateTime? toDate = null, string tags = null, string site_ = "stackoverflow", string filter = null, long? min_ = null)
+      public virtual IPagedList<Question> GetQuestions(QuestionSort sortBy = QuestionSort.Activity, SortDirection sortDirection = SortDirection.Descending, int? page = null, int? pageSize = null, DateTime? fromDate = null, DateTime? toDate = null, string tags = null, string site_ = "stackoverflow", string filter = null, long? min_ = null, string accessToken = null)
         {
             var sortArgs = sortBy.GetAttribute<SortArgsAttribute>();
-            return GetQuestions("questions", sortArgs.UrlArgs, sortArgs.Sort, GetSortDirection(sortDirection), page, pageSize, fromDate, toDate, tags, site_, filter, min_);
+            return GetQuestions("questions", sortArgs.UrlArgs, sortArgs.Sort, GetSortDirection(sortDirection), page, pageSize, fromDate, toDate, tags, site_, filter, min_, accessToken);
         }
 
         //public virtual IPagedList<Question> GetQuestionsByUser(int userId, QuestionsByUserSort sortBy = QuestionsByUserSort.Activity, SortDirection sortDirection = SortDirection.Descending, int? page = null, int? pageSize = null, bool includeBody = false, bool includeComments = false, bool includeAnswers = false, DateTime? fromDate = null, DateTime? toDate = null, int? min = null, int? max = null, string[] tags = null)
@@ -23,7 +23,7 @@ namespace Stacky
         //    return GetQuestions("users", new string[] { userId.ToString(), "favorites" }, sortBy.ToString().ToLower(), GetSortDirection(sortDirection), page, pageSize, includeBody, includeComments, includeAnswers, fromDate, toDate, min, max, tags);
         //}
 
-        private IPagedList<Question> GetQuestions(string method, string[] urlArguments, string sort_, string sortDirection, int? page, int? pageSize, DateTime? fromDate, DateTime? toDate, string tags = null, string site_ = "stackoverflow", string _filter = null, long? min_ = null)
+        private IPagedList<Question> GetQuestions(string method, string[] urlArguments, string sort_, string sortDirection, int? page, int? pageSize, DateTime? fromDate, DateTime? toDate, string tags = null, string site_ = "stackoverflow", string _filter = null, long? min_ = null, string accessToken = null)
         {
           var response = MakeRequest<QuestionResponse>(method, urlArguments, new
           {
@@ -39,11 +39,12 @@ namespace Stacky
             site = site_,
             filter = _filter,
             min = min_,
+            access_token = accessToken,
           });
           return new PagedList<Question>(response.Questions, response);
         }
 
-        public virtual IPagedList<Question> GetQuestions(IEnumerable<int> questionIds, int? page = null, int? pageSize = null, string site_ = "stackoverflow", string _filter = null)
+        public virtual IPagedList<Question> GetQuestions(IEnumerable<int> questionIds, int? page = null, int? pageSize = null, string site_ = "stackoverflow", string _filter = null, string accessToken = null)
         {
           var response = MakeRequest<QuestionResponse>("questions", new string[] { questionIds.Vectorize() }, new
           {
@@ -52,6 +53,7 @@ namespace Stacky
             pagesize = pageSize ?? null,
             site = site_,
             filter = _filter,
+            access_token = accessToken,
           });
           return new PagedList<Question>(response.Questions, response);
         }

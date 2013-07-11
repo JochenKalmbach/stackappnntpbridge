@@ -112,6 +112,9 @@
     <Compile Include="AdvancedSettingsDialog.xaml.cs">
       <DependentUpon>AdvancedSettingsDialog.xaml</DependentUpon>
     </Compile>
+    <Compile Include="AuthWindow.xaml.cs">
+      <DependentUpon>AuthWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="DebugWindow.xaml.cs">
       <DependentUpon>DebugWindow.xaml</DependentUpon>
     </Compile>
@@ -139,6 +142,10 @@
     <Compile Include="UploadDiagnoseData.cs" />
     <Compile Include="UserSettings.cs" />
     <Page Include="AdvancedSettingsDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="AuthWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -187,7 +194,6 @@
     </EntityDeploy>
     <None Include="App.Config" />
     <None Include="Model1.edmx.sqlce" />
-    <None Include="Properties\DataSources\NewsgroupsEntities.datasource" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>

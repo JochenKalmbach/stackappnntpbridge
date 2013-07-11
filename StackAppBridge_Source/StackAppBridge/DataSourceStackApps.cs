@@ -19,12 +19,15 @@ namespace StackAppBridge
   {
     private NewsgroupConfig _NewsgroupConfig;
 
-    public DataSourceStackApps()
+    public DataSourceStackApps(string accessToken)
     {
-      _management = new MsgNumberManagement(UserSettings.Default.BasePath);
+      _accessToken = accessToken;
+      _management = new MsgNumberManagement(UserSettings.Default.BasePath, _accessToken);
 
       ClearCache();
     }
+
+    private string _accessToken;
 
     public Encoding HeaderEncoding = Encoding.UTF8;
 
@@ -572,7 +575,7 @@ namespace StackAppBridge
         DisplayName = config.Name;
         Description = string.Format("Newsgroup from '{0}' with the tags: '{1}", config.Server, config.Tags);
 
-        StackyClient = new StackyClient("2.1", "9aT4ZKsThCbBFlD5skBrEw((", "http://api.stackexchange.com", new UrlClient(), new JsonProtocol());
+        StackyClient = new StackyClient("2.1", "9aT4ZKsThCbBFlD5skBrEw((", "https://api.stackexchange.com", new UrlClient(), new JsonProtocol());
       }
 
       private NewsgroupConfigEntry _config;
@@ -832,8 +835,9 @@ namespace StackAppBridge
   /// </remarks>
   internal class MsgNumberManagement
   {
-    public MsgNumberManagement(string basePath)
+    public MsgNumberManagement(string basePath, string acessToken)
     {
+      _accessToken = acessToken;
       _baseDir = System.IO.Path.Combine(basePath, "Data");
       if (System.IO.Directory.Exists(_baseDir) == false)
       {
@@ -845,6 +849,7 @@ namespace StackAppBridge
 
     private readonly LocalDbAccess _db;
     private readonly string _baseDir;
+    private readonly string _accessToken;
 
     /// <summary>
     /// Sets the max. Msg# and the number of messages for the given forum. It returns <c>false</c> if there are no messages stored for this forum.
@@ -1075,8 +1080,9 @@ namespace StackAppBridge
                                       site_:group.Site,
                                       //fromDate: lastActivityFrom);  // "fromDate" is always related to "CreationDate"!!!
                                       min_: lastActivityFrom.HasValue ? 
-                                      (long?)Stacky.DateHelper.ToUnixTime(lastActivityFrom.Value)
-                                      : null);  // And "min" is always related to "sort" value!
+                                      (long?)Stacky.DateHelper.ToUnixTime(lastActivityFrom.Value) : null,
+                                      accessToken: _accessToken
+                                      );  // And "min" is always related to "sort" value!
 
       hasMore = res.HasMore;
 
@@ -1225,7 +1231,7 @@ namespace StackAppBridge
       {
         case PostTypeQuestion:
           {
-            IPagedList<Question> result = group.StackyClient.GetQuestions(new[] { postId }, _filter: QuestionFilterNameWithBody, site_: group.Site);
+            IPagedList<Question> result = group.StackyClient.GetQuestions(new[] { postId }, _filter: QuestionFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
             var q = result.FirstOrDefault();
             Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetQuestion: id:{0}", map.PostId);
             if (q != null)
@@ -1236,7 +1242,7 @@ namespace StackAppBridge
           }
         case PostTypeAnswer:
           {
-            IPagedList<Answer> result = group.StackyClient.GetAnswers(new[] { postId }, filter_: QuestionFilterNameWithBody, site_: group.Site);
+            IPagedList<Answer> result = group.StackyClient.GetAnswers(new[] { postId }, filter_: QuestionFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
             var a = result.FirstOrDefault();
             Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetAnswer: id:{0}", map.PostId);
             if (a != null)
@@ -1247,7 +1253,7 @@ namespace StackAppBridge
           }
         case PostTypeComment:
           {
-            IPagedList<Comment> result = group.StackyClient.GetComments(new[] { postId }, filter_: QuestionFilterNameWithBody, site_: group.Site);
+            IPagedList<Comment> result = group.StackyClient.GetComments(new[] { postId }, filter_: QuestionFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
             var c = result.FirstOrDefault();
             Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetComment: id:{0}", map.PostId);
             if (c != null)

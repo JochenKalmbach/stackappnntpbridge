@@ -58,6 +58,7 @@ namespace StackAppBridge
             var u = new UserSettings();
             u._autoMinimize = this._autoMinimize;
             u._autoStart = this._autoStart;
+          u._useAuthentication = this._useAuthentication;
             u._bindToWorld = this._bindToWorld;
             u._port = this._port;
             u._usePlainTextConverter = this._usePlainTextConverter;
@@ -153,6 +154,10 @@ namespace StackAppBridge
                     if (b.HasValue)
                         AutoStart = b.Value;
 
+                    b = GetBoolean(r, "UseAuthentication");
+                    if (b.HasValue)
+                      UseAuthentication = b.Value;
+
                     b = GetBoolean(r, "AutoMinimize");
                     if (b.HasValue)
                         AutoMinimize = b.Value;
@@ -216,6 +221,8 @@ namespace StackAppBridge
               using (var r = UserAppDataRegistryForWriting)
               {
                 SetBoolean(r, "AutoStart", AutoStart);
+
+                SetBoolean(r, "UseAuthentication", UseAuthentication);
 
                 SetBoolean(r, "AutoMinimize", AutoMinimize);
 
@@ -386,6 +393,16 @@ namespace StackAppBridge
         #endregion
 
         #region Setting Properties
+
+        private bool _useAuthentication = true;
+        [Category("General")]
+        [DefaultValue(true)]
+        [Description("If this is true, authentication will be required.")]
+        public bool UseAuthentication
+        {
+          get { return _useAuthentication; }
+          set { _useAuthentication = value; }
+        }
 
         private bool _autoStart = true;
         [Category("General")]

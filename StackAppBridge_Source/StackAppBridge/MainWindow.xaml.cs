@@ -283,8 +283,25 @@ namespace StackAppBridge
     }
 
 
+    private string _accessToken;
+
     private static void StartBridgeInternal(MainWindow t, int port)
     {
+      if (UserSettings.Default.UseAuthentication)
+      {
+        // Try to login....
+        var dlg = new AuthWindow();
+        //dlg.Owner = t;
+        if (dlg.ShowDialog() == true)
+        {
+          t._accessToken = dlg.AccessToken;
+        }
+        else
+        {
+          Traces.Main_TraceEvent(TraceEventType.Error, 1, string.Format(string.Format("Authentication failed: {0}", dlg.ErrorDescription)));
+        }
+      }
+
       //// Authenticate with Live Id
       //var authenticationData = new AuthenticationInformation();
       //Traces.Main_TraceEvent(TraceEventType.Verbose, 1, "LiveId: Try authentication");
@@ -351,7 +368,7 @@ namespace StackAppBridge
 
       // Create our DataSource for the forums
       Traces.Main_TraceEvent(TraceEventType.Verbose, 1, "Creating datasource for NNTP server");
-      t._forumsDataSource = new DataSourceStackApps();
+      t._forumsDataSource = new DataSourceStackApps(t._accessToken);
       t._forumsDataSource.UsePlainTextConverter = UserSettings.Default.UsePlainTextConverter;
       t._forumsDataSource.AutoLineWrap = UserSettings.Default.AutoLineWrap;
       t._forumsDataSource.HeaderEncoding = UserSettings.Default.EncodingForClientEncoding;
