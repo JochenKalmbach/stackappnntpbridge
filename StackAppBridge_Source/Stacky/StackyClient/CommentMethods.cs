@@ -82,9 +82,9 @@ namespace Stacky
         //    return new PagedList<Comment>(response.Comments, response);
         //}
 
-      public virtual IPagedList<Comment> GetComments(IEnumerable<int> answerIds, string site_ = "stackoverflow", string filter_ = null, string accessToken = null)
+      public virtual IPagedList<Comment> GetComments(IEnumerable<int> commentIds, string site_ = "stackoverflow", string filter_ = null, string accessToken = null)
         {
-          var response = MakeRequest<CommentResponse>("comments", new [] { answerIds.Vectorize()}, new
+          var response = MakeRequest<CommentResponse>("comments", new[] { commentIds.Vectorize() }, new
           {
             key = apiKey,
             site = site_,

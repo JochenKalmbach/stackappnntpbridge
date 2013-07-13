@@ -261,20 +261,19 @@ namespace StackAppBridge
         }
       }
 
-      ForumArticle a = _management.GetMessageById(g, postId);
-      if (a == null) return null;
+      ForumArticle art = _management.GetMessageById(g, postId);
 
-      ConvertNewArticleFromWebService(a);
+      ConvertNewArticleFromWebService(art);
 
       // Only store the message if the Msg# is correct!
       if (UserSettings.Default.DisableArticleCache == false)
       {
         lock (g.Articles)
         {
-          g.Articles[a.Number] = a;
+          g.Articles[art.Number] = art;
         }
       }
-      return a;
+      return art;
     }
 
     #region IArticleConverter
@@ -354,19 +353,20 @@ namespace StackAppBridge
         }
       }
 
-      var a = _management.GetMessageByMsgNo(g, articleNumber);
-      if (a == null) return null;
+      IEnumerable<ForumArticle> a = _management.GetMessageStreamByMsgNo(g, new[] { articleNumber });
+      if ((a == null) || (a.Any() == false)) return null;
+      ForumArticle art = a.First();
 
-      ConvertNewArticleFromWebService(a);
+      ConvertNewArticleFromWebService(art);
 
       if (UserSettings.Default.DisableArticleCache == false)
       {
         lock (g.Articles)
         {
-          g.Articles[a.Number] = a;
+          g.Articles[art.Number] = art;
         }
       }
-      return a;
+      return art;
     }
 
     public override void GetArticlesByNumberToStream(string clientUsername, string groupName, int firstArticle,
@@ -392,7 +392,7 @@ namespace StackAppBridge
           if (g.ArticlesAvailable == false)
           {
             // If we never had checked for acrticles, we first need to do this...
-            var articles = _management.UpdateGroupFromWebService(g, OnProgressData, ConvertNewArticleFromWebService);
+            _management.UpdateGroupFromWebService(g, OnProgressData, ConvertNewArticleFromWebService);
           }
         }
       }
@@ -408,9 +408,11 @@ namespace StackAppBridge
       if (lastArticle > g.LastArticle)
         lastArticle = g.LastArticle;
 
+      var missingArticles = new List<int>();
       for (int no = firstArticle; no <= lastArticle; no++)
       {
         Article a = null;
+        // Check if the article is in the cache...
         if (UserSettings.Default.DisableArticleCache == false)
         {
           lock (g.Articles)
@@ -419,25 +421,46 @@ namespace StackAppBridge
               a = g.Articles[no];
           }
         }
+
+        bool flushMissingList = false;
+        if (a != null)
+          flushMissingList = true;  // now there is again an article available, so flush the previous articles...
+        if (no == lastArticle)
+          flushMissingList = true;  // if it is the last article, then we need to flush our missing list
+        if (missingArticles.Count >= 95)  // limit is 100  // If we reached a limit of 95, we need to query for the articles...
+          flushMissingList = true;
+
         if (a == null)
+          missingArticles.Add(no);
+
+        if (flushMissingList)
         {
-          var res = _management.GetMessageByMsgNo(g, no);
-          if (res != null)
+          if (missingArticles.Count > 0)
           {
-            a = res;
-            ConvertNewArticleFromWebService(a);
-            if (UserSettings.Default.DisableArticleCache == false)
+            // First process the missing articles...
+            var articles = _management.GetMessageStreamByMsgNo(g, missingArticles);
+            foreach (Article article in articles)
             {
-              lock (g.Articles)
+              ConvertNewArticleFromWebService(article);
+              if (UserSettings.Default.DisableArticleCache == false)
               {
-                if (g.Articles.ContainsKey(no) == false)
-                  g.Articles[no] = a;
+                lock (g.Articles)
+                {
+                  if (g.Articles.ContainsKey(article.Number) == false)
+                    g.Articles[article.Number] = article;
+                }
               }
+              // output the now fetched articles...
+              articlesProgressAction(new[] {article});
             }
+            missingArticles.Clear();
           }
         }
+
+        // if there was an article available, then output this article also...
         if (a != null)
-          articlesProgressAction(new [] {a});
+          articlesProgressAction(new[] { a });
+
       }
     }
 
@@ -846,21 +869,6 @@ namespace StackAppBridge
   /// This class is responsible for providing the corret message number for a forum / tread / message
   /// </summary>
   /// <remarks>
-  /// The concept is as follows:
-  /// - At the beginning, the max. Msgä is 1000
-  /// - If the first message is going to be retrived, then the last x days of messages are retrived from the forum
-  /// 
-  /// 
-  /// - Last message number (Msg#) of the group -
-  /// There must be a difference between the first time and the later requests.
-  /// The first time, we need to find out how many messages we want to retrive from the web-service.
-  /// The logic will be:
-  /// - Retrive the last xxx threads via "GetThreadListByForumId(id, locale, metadataFilter[], threadfilter[], threadSortOrder?, sortDirection, startRow, maxRows, optional)"
-  ///   - With this, we have a list of the last xxx threads with the corresponding "ReplyCountField" from the ThreadStatistics
-  ///   - Then we start the Msg# with "10000" (constant)
-  ///   - Then we calculate the last Msg# by "threads + (foreach += thread.ReplyCount) and we also save the Msg# for each thread
-  ///   - Alternatively we request the whole list of replies to each thread and store the id
-  ///   - After we have all messages, we sort it by date and generate the Msg#
   /// </remarks>
   internal class MsgNumberManagement
   {
@@ -1101,6 +1109,8 @@ namespace StackAppBridge
     // Default + answer.comments;answer.link;answer.body;question.answers;question.comments;question.body;comment.link;comment.body
     internal const string QuestionFilterNameWithBody = "!0ZPuz7ZFJF)YU8rYJHAppml3Z";
 
+    internal const string ContentFilterNameWithBody = "!LpJqjkreSIQ6*xoTTxulB3";
+
     internal const int PostTypeQuestion = 0;
     internal const int PostTypeComment = 1;
     internal const int PostTypeAnswer = 2;
@@ -1254,24 +1264,7 @@ namespace StackAppBridge
       {
         using (var con = _db.CreateConnection(forumNewsgroup.GroupName))
         {
-            map = con.Mappings.FirstOrDefault(p => p.PostId == postId);
-        }
-      }
-      if (map == null)
-      {
-        return null;
-      }
-      return InternalGetMsgById(forumNewsgroup, map);
-    }
-
-    public ForumArticle GetMessageByMsgNo(ForumNewsgroup forumNewsgroup, int articleNumber)
-    {
-      Mapping map;
-      lock (forumNewsgroup)
-      {
-        using (var con = _db.CreateConnection(forumNewsgroup.GroupName))
-        {
-          map = con.Mappings.FirstOrDefault(p => p.NNTPMessageNumber == articleNumber);
+          map = con.Mappings.FirstOrDefault(p => p.PostId == postId);
         }
       }
       if (map == null)
@@ -1283,12 +1276,12 @@ namespace StackAppBridge
 
     private ForumArticle InternalGetMsgById(ForumNewsgroup group, Mapping map)
     {
-      int postId = (int) map.PostId;
+      int postId = (int)map.PostId;
       switch (map.PostType)
       {
         case PostTypeQuestion:
           {
-            IPagedList<Question> result = group.StackyClient.GetQuestions(new[] { postId }, _filter: QuestionFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
+            IPagedList<Question> result = group.StackyClient.GetQuestions(new[] { postId }, _filter: ContentFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
             LogPageResult(result, group.GroupName);
             var q = result.FirstOrDefault();
             Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetQuestion: id:{0}", map.PostId);
@@ -1300,7 +1293,7 @@ namespace StackAppBridge
           }
         case PostTypeAnswer:
           {
-            IPagedList<Answer> result = group.StackyClient.GetAnswers(new[] { postId }, filter_: QuestionFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
+            IPagedList<Answer> result = group.StackyClient.GetAnswers(new[] { postId }, filter_: ContentFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
             LogPageResult(result, group.GroupName);
             var a = result.FirstOrDefault();
             Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetAnswer: id:{0}", map.PostId);
@@ -1312,7 +1305,7 @@ namespace StackAppBridge
           }
         case PostTypeComment:
           {
-            IPagedList<Comment> result = group.StackyClient.GetComments(new[] { postId }, filter_: QuestionFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
+            IPagedList<Comment> result = group.StackyClient.GetComments(new[] { postId }, filter_: ContentFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
             LogPageResult(result, group.GroupName);
             var c = result.FirstOrDefault();
             Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetComment: id:{0}", map.PostId);
@@ -1325,102 +1318,71 @@ namespace StackAppBridge
       }
       return null;
     }
+    
+    public IEnumerable<ForumArticle> GetMessageStreamByMsgNo(ForumNewsgroup group, IEnumerable<int> missingArticles)
+    {
+      var maps = new List<Mapping>();
+        using (var con = _db.CreateConnection(group.GroupName))
+        {
+          maps.AddRange(missingArticles.Select(articleNumber => con.Mappings.FirstOrDefault(p => p.NNTPMessageNumber == articleNumber)).Where(map => map != null));
+        }
+      
+      // Now differentiate between Answer/Questions and Comments
+        Mapping[] questions = maps.Where(p => p.PostType == PostTypeQuestion).ToArray();
+      Mapping[] answers = maps.Where(p => p.PostType == PostTypeAnswer).ToArray();
+      Mapping[] comments = maps.Where(p => p.PostType == PostTypeComment).ToArray();
 
-    //private static void GetMetaDataString(int deep, MetaData metaData, StringBuilder result, List<string> subForumNames, string parentName)
-    //{
-    //  string myNewsGroupName = parentName;
-    //  if (metaData.MetaDataTypes.Any(p => p.Id == MetaDataInfo.MetaValue))
-    //  {
-    //    myNewsGroupName += "." + metaData.ShortName;
-    //    subForumNames.Add(myNewsGroupName);
-    //  }
-    //  var deepStr = new string(' ', deep * 2);
-    //  result.AppendFormat("{0} {1:00} Short: '{2}' Display: '{3}' Locale: '{4}, Id: {5}<br/>", deepStr, deep, metaData.ShortName, metaData.DisplayName, metaData.LocaleName, metaData.Id);
-    //  foreach (var types in metaData.MetaDataTypes)
-    //  {
-    //    result.AppendFormat("{0}  {1:00} Type: {2}, Id: {3}<br/>", deepStr, deep, types.ShortName, types.Id);
-    //  }
-    //  foreach (var childMetaData in metaData.ChildMetaData)
-    //  {
-    //    GetMetaDataString(deep + 1, childMetaData, result, subForumNames, myNewsGroupName);
-    //  }
-    //}
 
-    //public void SaveGroupFilterData(ForumNewsgroup g)
-    //{
-    //  if ((g.MetaDataInfo != null) && (g.MetaDataInfo.FilterIds != null))
-    //  {
-    //    var sb = new StringBuilder();
-    //    foreach (var fd in g.MetaDataInfo.FilterIds)
-    //    {
-    //      if (sb.Length > 0) sb.Append(":");
-    //      sb.Append(fd.ToString("D"));
-    //    }
-    //    string fn = IniFile(g.BaseGroupName, "FilterData.ini");
-    //    IniHelper.SetString(g.GroupName.ToLowerInvariant(), "Name", g.MetaDataInfo.Name, fn);
-    //    IniHelper.SetString(g.GroupName.ToLowerInvariant(), "FilterData", sb.ToString(), fn);
-    //  }
-    //}
-    //public MetaDataInfo LoadGroupFilterData(string baseGroupName, string groupName)
-    //{
-    //  string fn = IniFile(baseGroupName, "FilterData.ini");
-    //  string s = IniHelper.GetString(groupName.ToLowerInvariant(), "FilterData", fn);
-    //  if (string.IsNullOrEmpty(s))
-    //    return null;
-    //  string[] ids = s.Split(':');
-    //  Guid[] guids = new Guid[ids.Length];
-    //  for (int i = 0; i < ids.Length; i++)
-    //  {
-    //    guids[i] = Guid.ParseExact(ids[i], "D");
-    //  }
-    //  var md = new MetaDataInfo();
-    //  md.FilterIds = guids;
-    //  md.Name = IniHelper.GetString(groupName.ToLowerInvariant(), "Name", fn);
-    //  return md;
-    //}
+      var res = new List<ForumArticle>();
 
-    //public void SaveAllMetaData(ForumNewsgroup g)
-    //{
-    //  if (g.UniqueInfos != null)
-    //  {
-    //    string fn = IniFile(g.BaseGroupName, "AllMetaData.ini");
-    //    foreach (var md in g.UniqueInfos)
-    //    {
-    //      IniHelper.SetString(md.FilterIds[0].ToString("D"), "Name", md.Name, fn);
-    //    }
-    //  }
-    //}
-    //public IEnumerable<MetaDataInfo> LoadAllMetaData(QnAClient provider, Guid forumId, string locale, string baseGroupName, bool forceUpdate = false)
-    //{
-    //  var infos = new List<MetaDataInfo>();
-    //  string fn = IniFile(baseGroupName, "AllMetaData.ini");
-    //  string[] sections = IniHelper.GetSectionNamesFromIni(fn);
-    //  if (sections != null)
-    //  {
-    //    foreach (var s in sections)
-    //    {
-    //      var md = new MetaDataInfo();
-    //      md.FilterIds = new[] {Guid.ParseExact(s, "D")};
-    //      md.Name = IniHelper.GetString(s, "Name", fn);
-    //      infos.Add(md);
-    //    }
-    //  }
-    //  if ((provider != null) && ((infos.Count <= 0) || forceUpdate) )
-    //  {
-    //    var result = provider.GetMetaDataListByForumId(forumId, locale);
-    //    var uniqueInfos = new List<MetaDataInfo>();
-    //    if (result != null)
-    //    {
-    //      foreach (var metaData in result)
-    //      {
-    //        MetaDataInfo.GetMetaDataInfos(metaData, uniqueInfos, null);
-    //      }
-    //    }
-    //    infos = uniqueInfos.ToList();
-    //  }
+      if (questions.Any())
+      {
+        IPagedList<Question> result = group.StackyClient.GetQuestions(questions.Select(p => (int)p.PostId), _filter: ContentFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
+        LogPageResult(result, group.GroupName);
+        foreach (Question question in result)
+        {
+          var map = questions.First(r => r.PostId == question.Id);
+          Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetQuestions: id:{0}", map.PostId);
+          res.Add(new ForumArticle(group, map, question));
+        }
+      }
 
-    //  return infos;
-    //}
+      if (answers.Any())
+      {
+        IPagedList<Answer> result = group.StackyClient.GetAnswers(answers.Select(p => (int)p.PostId), filter_: ContentFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
+        LogPageResult(result, group.GroupName);
+        foreach (Answer answer in result)
+        {
+          var map = answers.First(r => r.PostId == answer.Id);
+          Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetAnswers: id:{0}", map.PostId);
+          res.Add(new ForumArticle(group, map, answer));
+        }
+      }
+
+      if (comments.Any())
+      {
+        IPagedList<Comment> result = group.StackyClient.GetComments(comments.Select(p => (int)p.PostId), filter_: ContentFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
+        LogPageResult(result, group.GroupName);
+        foreach (Comment comment in result)
+        {
+          var map = comments.First(r => r.PostId == comment.Id);
+          Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetComments: id:{0}", map.PostId);
+          res.Add(new ForumArticle(group, map, comment));
+        }
+      }
+
+      // So, now sort the articles again (by NNTP Number)...
+      res.Sort((a, b) =>
+        {
+          if (a.MappingValue.NNTPMessageNumber == b.MappingValue.NNTPMessageNumber)
+            return 0;
+          if (a.MappingValue.NNTPMessageNumber < b.MappingValue.NNTPMessageNumber)
+            return -1;
+          return 1;
+        });
+
+      return res;
+     }
   } // class MsgNumberManagement
 
 
