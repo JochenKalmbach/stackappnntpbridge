@@ -12,6 +12,16 @@ namespace Stacky
   [JsonObject]
   public class Notification
   {
+    public string ToJson()
+    {
+      return JsonConvert.SerializeObject(this,
+        new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+    }
+    public static Notification FromJson(string text)
+    {
+      return JsonConvert.DeserializeObject<Notification>(text);
+    }
+
     [JsonProperty("body")]
     public string Body { get; set; }
 
@@ -28,6 +38,6 @@ namespace Stacky
     public int PostId { get; set; }
 
     [JsonProperty("site")]
-    public string Site { get; set; }
+    public Site Site { get; set; }
   }
 }

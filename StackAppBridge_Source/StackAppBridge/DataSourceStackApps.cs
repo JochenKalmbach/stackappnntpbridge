@@ -918,8 +918,46 @@ namespace StackAppBridge
       private Comment _comment;
       private Answer _answer;
       private InboxItem _inboxItem;
+      private Notification _notification;
 #endif
 
+
+      public ForumArticle(ForumNewsgroup g, Mapping mapping, Notification notify)
+        : base((int)mapping.NNTPMessageNumber)
+      {
+#if DEBUG
+        _notification = notify;
+#endif
+        Id = MappingToInboxId(mapping);
+
+        MappingValue = mapping;
+
+        DateTime dt = notify.CreationDate;
+        Date = string.Format("{0} +0000", dt.ToString("ddd, d MMM yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture));
+
+        const string author = "Notification";
+        From = author;
+        DisplayName = author;
+
+        Subject = mapping.Title;
+
+        Newsgroups = g.GroupName;
+        ParentNewsgroup = Newsgroups;
+        Path = "LOCALHOST.StackAppBridge";
+
+        var mhStr = new StringBuilder();
+        mhStr.Append("<br/>-----<br/>");
+        mhStr.Append("<strong>NOTIFICATION: ");
+        mhStr.Append(notify.NotificationType);
+        mhStr.Append("</strong>");
+        if (notify.PostId != 0)
+          mhStr.AppendFormat("<br/>PostId: {0}", notify.PostId);
+        if (notify.CreationDate != DateTime.MinValue)
+          mhStr.AppendFormat("<br/>Created: {0:yyyy-MM-dd HH:mm:ss}", notify.CreationDate);
+        mhStr.Append("<br/>-----<br/>");
+
+        Body = notify.Body + mhStr;
+      }
 
       public ForumArticle(ForumNewsgroup g, Mapping mapping, InboxItem inboxItem)
         : base((int)mapping.NNTPMessageNumber)
@@ -946,7 +984,10 @@ namespace StackAppBridge
         From = author;
         DisplayName = author;
 
-        Subject = mapping.Title;
+        string sub = string.Empty;
+        if ((inboxItem.Site != null) && (string.IsNullOrEmpty(inboxItem.Site.Name) == false))
+          sub = string.Format("[{0}] ", inboxItem.Site.Name);
+        Subject = sub + mapping.Title;
 
         Newsgroups = g.GroupName;
         ParentNewsgroup = Newsgroups;
@@ -1121,6 +1162,143 @@ namespace StackAppBridge
       }
     }
 
+    private string NotifyTitle(Notification n)
+    {
+      var sb = new StringBuilder();
+      if ((n.Site != null) && (string.IsNullOrEmpty(n.Site.Name) == false))
+        sb.AppendFormat("[{0}] ", n.Site.Name);
+      sb.Append(n.NotificationType);
+      if (n.PostId != 0)
+        sb.AppendFormat(" (Post: {0})", n.PostId);
+      return sb.ToString();
+    }
+
+    private IEnumerable<ForumArticle> UpdateInboxAndNotifyItems(ForumNewsgroup group, Action<string> progress,
+                                                                Action<ForumArticle> articleConverter)
+    {
+      GetMaxMessageNumber(group);
+
+      var internalArticles = new List<ForumArticle>();
+      int maxNumber = group.LastArticle;
+      using (var con = _db.CreateConnection(group.GroupName))
+      {
+        // InboxItems
+        foreach (string site in group.InboxSites)
+        {
+          var inboxItems = group.StackyClient.GetInboxItems(accessToken: _accessToken,
+                                                            _filter: ContentFilterNameWithBody, site_: site);
+          foreach (InboxItem inboxItem in inboxItems)
+          {
+            DateTime cd = inboxItem.CreationDate;
+            var existing =
+              con.Mappings.Where(
+                p => p.CreatedDate == cd && p.PostType == ForumArticle.InboxTypInboxItem)
+                 .ToArray();
+            if ((existing.Any() == false) ||
+                (existing.Any(p => string.Equals(p.Title, inboxItem.Title, StringComparison.Ordinal)) == false))
+            {
+              // It does not exist.. so add it...
+              var map = new Mapping();
+              map.Id = Guid.NewGuid();
+              map.PostType = ForumArticle.InboxTypInboxItem;
+              map.NNTPMessageNumber = ++maxNumber;
+              map.PostId = map.NNTPMessageNumber;
+              map.CreatedDate = inboxItem.CreationDate;
+              map.Title = inboxItem.Title;
+
+              // Reset alll unused items...
+              inboxItem.Title = null;
+              if (inboxItem.Site != null)
+              {
+                inboxItem.Site.Aliases = null;
+                inboxItem.Site.ApiEndpoint = null;
+                inboxItem.Site.ApiSiteParameter = null;
+                inboxItem.Site.Audience = null;
+                inboxItem.Site.ClosedBetaDate = DateTime.MinValue;
+                inboxItem.Site.Description = null;
+                inboxItem.Site.FaviconUrl = null;
+                inboxItem.Site.IconUrl = null;
+                inboxItem.Site.LaunchDate = DateTime.MinValue;
+                inboxItem.Site.LogoUrl = null;
+                inboxItem.Site.MarkdownExtensions = null;
+                inboxItem.Site.OpenBetaDate = DateTime.MinValue;
+                inboxItem.Site.SiteUrl = null;
+                inboxItem.Site.Styling = null;
+                inboxItem.Site.TwitterAccount = null;
+                inboxItem.Site.Type = null;
+              }
+              map.Info = inboxItem.ToJson();
+              con.Mappings.AddObject(map);
+
+              internalArticles.Add(new ForumArticle(group, map, inboxItem));
+            }
+          }
+        }
+
+
+        // Notification
+        var notifyItems = group.StackyClient.GetNotifications(accessToken: _accessToken,
+                                                              _filter: ContentFilterNameWithBody);
+        foreach (Notification notifyItem in notifyItems)
+        {
+          DateTime cd = notifyItem.CreationDate;
+          var existing =
+            con.Mappings.Where(
+              p => p.CreatedDate == cd && p.PostType == ForumArticle.InboxTypNotification)
+               .ToArray();
+
+          if ((existing.Any() == false) || (existing.Any(p => string.Equals(p.Title, NotifyTitle(notifyItem)) == false)))
+          {
+            // It does not exist.. so add it...
+            var map = new Mapping();
+            map.PostType = ForumArticle.InboxTypNotification;
+            map.Id = Guid.NewGuid();
+            map.NNTPMessageNumber = ++maxNumber;
+            map.PostId = map.NNTPMessageNumber;
+            map.CreatedDate = notifyItem.CreationDate;
+            map.Title = NotifyTitle(notifyItem);
+
+            // Reset alll unused items...
+            if (notifyItem.Site != null)
+            {
+              notifyItem.Site.Aliases = null;
+              notifyItem.Site.ApiEndpoint = null;
+              notifyItem.Site.ApiSiteParameter = null;
+              notifyItem.Site.Audience = null;
+              notifyItem.Site.ClosedBetaDate = DateTime.MinValue;
+              notifyItem.Site.Description = null;
+              notifyItem.Site.FaviconUrl = null;
+              notifyItem.Site.IconUrl = null;
+              notifyItem.Site.LaunchDate = DateTime.MinValue;
+              notifyItem.Site.LogoUrl = null;
+              notifyItem.Site.MarkdownExtensions = null;
+              notifyItem.Site.OpenBetaDate = DateTime.MinValue;
+              notifyItem.Site.SiteUrl = null;
+              notifyItem.Site.Styling = null;
+              notifyItem.Site.TwitterAccount = null;
+              notifyItem.Site.Type = null;
+            }
+            map.Info = notifyItem.ToJson();
+            con.Mappings.AddObject(map);
+
+            internalArticles.Add(new ForumArticle(group, map, notifyItem));
+          }
+        }
+
+        if (internalArticles.Any())
+        {
+          con.SaveChanges(SaveOptions.None);
+        }
+        else
+        {
+          return null;
+        }
+      }
+
+      GetMaxMessageNumber(group);
+      return internalArticles;
+    }
+
     /// <summary>
     /// Updates the group from the web service.
     /// </summary>
@@ -1142,70 +1320,7 @@ namespace StackAppBridge
 
         if (group.IsInboxGroup)
         {
-          GetMaxMessageNumber(group);
-
-          var internalArticles = new List<ForumArticle>();
-          int maxNumber = group.LastArticle;
-          using (var con = _db.CreateConnection(group.GroupName))
-          {
-            foreach (string site in group.InboxSites)
-            {
-              var inboxItems = group.StackyClient.GetInboxItems(accessToken: _accessToken,
-                                                                _filter: ContentFilterNameWithBody, site_: site);
-              foreach (InboxItem inboxItem in inboxItems)
-              {
-                DateTime cd = inboxItem.CreationDate;
-                var existing =
-                  con.Mappings.Where(
-                    p => p.CreatedDate == cd && p.PostType == ForumArticle.InboxTypInboxItem)
-                     .ToArray();
-                if (existing.Any(p => string.Equals(p.Title, inboxItem.Title, StringComparison.Ordinal)) == false)
-                {
-                  // It does not exist.. so add it...
-                  var map = new Mapping();
-                  map.Id = Guid.NewGuid();
-                  map.NNTPMessageNumber = ++maxNumber;
-                  map.PostId = map.NNTPMessageNumber;
-                  map.CreatedDate = inboxItem.CreationDate;
-                  map.Title = inboxItem.Title;
-
-                  // Reset alll unused items...
-                  inboxItem.Title = null;
-                  if (inboxItem.Site != null)
-                  {
-                    inboxItem.Site.Aliases = null;
-                    inboxItem.Site.ApiEndpoint = null;
-                    inboxItem.Site.ApiSiteParameter = null;
-                    inboxItem.Site.Audience = null;
-                    inboxItem.Site.ClosedBetaDate = DateTime.MinValue;
-                    inboxItem.Site.Description = null;
-                    inboxItem.Site.FaviconUrl = null;
-                    inboxItem.Site.IconUrl = null;
-                    inboxItem.Site.LaunchDate = DateTime.MinValue;
-                    inboxItem.Site.LogoUrl = null;
-                    inboxItem.Site.MarkdownExtensions = null;
-                    inboxItem.Site.OpenBetaDate = DateTime.MinValue;
-                    inboxItem.Site.SiteUrl = null;
-                    inboxItem.Site.Styling = null;
-                    inboxItem.Site.TwitterAccount = null;
-                    inboxItem.Site.Type = null;
-                  }
-                  map.Info = inboxItem.ToJson();
-                  con.Mappings.AddObject(map);
-
-                  internalArticles.Add(new ForumArticle(group, map, inboxItem));
-                }
-              }
-            }
-            if (internalArticles.Any())
-            {
-              con.SaveChanges(SaveOptions.None);
-            }
-          }
-
-          GetMaxMessageNumber(group);
-
-          return internalArticles;
+          return UpdateInboxAndNotifyItems(group, progress, articleConverter);
         }
 
         // First get the Msg# from the local mapping table:
@@ -1651,8 +1766,16 @@ namespace StackAppBridge
           Mapping map = con.Mappings.FirstOrDefault(p => p.Id == map1.Id);
           if (map != null)
           {
-            InboxItem inboxItem = InboxItem.FromJson(map.Info);
-            return new ForumArticle(group, map, inboxItem);
+            if (map.PostType == ForumArticle.InboxTypInboxItem)
+            {
+              InboxItem inboxItem = InboxItem.FromJson(map.Info);
+              return new ForumArticle(group, map, inboxItem);
+            }
+            if (map.PostType == ForumArticle.InboxTypNotification)
+            {
+              Notification notify = Notification.FromJson(map.Info);
+              return new ForumArticle(group, map, notify);
+            }
           }
         }
         return null;
@@ -1666,8 +1789,16 @@ namespace StackAppBridge
         Mapping map = con.Mappings.FirstOrDefault(p => p.NNTPMessageNumber == articleNumber);
         if (map != null)
         {
-          InboxItem inboxItem = InboxItem.FromJson(map.Info);
-          return new ForumArticle(group, map, inboxItem);
+          if (map.PostType == ForumArticle.InboxTypInboxItem)
+          {
+            InboxItem inboxItem = InboxItem.FromJson(map.Info);
+            return new ForumArticle(group, map, inboxItem);
+          }
+          if (map.PostType == ForumArticle.InboxTypNotification)
+          {
+            Notification notify = Notification.FromJson(map.Info);
+            return new ForumArticle(group, map, notify);
+          }
         }
         return null;
       }
