@@ -56,7 +56,9 @@
     <Compile Include="Entities\BadgeCounts.cs" />
     <Compile Include="Entities\Comment.cs" />
     <Compile Include="Entities\Entity.cs" />
+    <Compile Include="Entities\InboxItem.cs" />
     <Compile Include="Entities\MigrationInfo.cs" />
+    <Compile Include="Entities\Notification.cs" />
     <Compile Include="Entities\PostEvent.cs" />
     <Compile Include="Entities\Privilege.cs" />
     <Compile Include="Entities\Question.cs" />
@@ -122,6 +124,8 @@
     <Compile Include="Responses\BadgeResponse.cs" />
     <Compile Include="Responses\CommentResponse.cs" />
     <Compile Include="Responses\ErrorResponse.cs" />
+    <Compile Include="Responses\InboxItemResponse.cs" />
+    <Compile Include="Responses\NotificationResponse.cs" />
     <Compile Include="Responses\PrivilegeResponse.cs" />
     <Compile Include="Responses\QuestionResponse.cs" />
     <Compile Include="Responses\QuestionTimelineResponse.cs" />

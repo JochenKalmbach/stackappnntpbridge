@@ -28,14 +28,18 @@ namespace StackAppBridge
   /// </remarks>
   public partial class AuthWindow : Window
   {
-    public AuthWindow()
+    private const string baseUrl = "https://stackexchange.com/oauth/dialog?client_id=1736&scope={0}&redirect_uri=https://stackexchange.com/oauth/login_success";
+    public AuthWindow(IEnumerable<string> scopes)
     {
+      _url = string.Format(baseUrl, string.Join(",", scopes));
       InitializeComponent();
     }
 
+    private string _url;
+
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
-      WebBrowser.Navigate("https://stackexchange.com/oauth/dialog?client_id=1736&scope=no_expiry&redirect_uri=https://stackexchange.com/oauth/login_success");
+      WebBrowser.Navigate(_url);
     }
 
     private void WebBrowser_OnNavigated(object sender, NavigationEventArgs e)

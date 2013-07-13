@@ -59,6 +59,7 @@ namespace StackAppBridge
             u._autoMinimize = this._autoMinimize;
             u._autoStart = this._autoStart;
           u._useAuthentication = this._useAuthentication;
+          u._showInboxAndNotifications = this._showInboxAndNotifications;
             u._bindToWorld = this._bindToWorld;
             u._port = this._port;
             u._usePlainTextConverter = this._usePlainTextConverter;
@@ -158,6 +159,10 @@ namespace StackAppBridge
                     if (b.HasValue)
                       UseAuthentication = b.Value;
 
+                    b = GetBoolean(r, "ShowInboxAndNotifications");
+                    if (b.HasValue)
+                      ShowInboxAndNotifications = b.Value;
+
                     b = GetBoolean(r, "AutoMinimize");
                     if (b.HasValue)
                         AutoMinimize = b.Value;
@@ -223,6 +228,8 @@ namespace StackAppBridge
                 SetBoolean(r, "AutoStart", AutoStart);
 
                 SetBoolean(r, "UseAuthentication", UseAuthentication);
+
+                SetBoolean(r, "ShowInboxAndNotifications", ShowInboxAndNotifications);
 
                 SetBoolean(r, "AutoMinimize", AutoMinimize);
 
@@ -626,6 +633,7 @@ namespace StackAppBridge
       }
 
       private MessageInfoEnum _messageInfos = MessageInfoEnum.InSignature;
+
       [Category("Messages")]
       public MessageInfoEnum MessageInfos
       {
@@ -638,6 +646,15 @@ namespace StackAppBridge
       [Category("Messages")]
       [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Content)]
       public NewsgroupConfigEntryCollection Newsgroups { get; set; }
+
+      private bool _showInboxAndNotifications = true;
+      [Category("General")]
+     [DefaultValue(true)]
+      public bool ShowInboxAndNotifications
+      {
+        get { return _showInboxAndNotifications; }
+        set { _showInboxAndNotifications = value; }
+      }
     }  // class UserSettings
 
 

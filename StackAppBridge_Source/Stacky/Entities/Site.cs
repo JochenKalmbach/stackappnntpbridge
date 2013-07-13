@@ -95,21 +95,21 @@ namespace Stacky
             set { styling = value; NotifyOfPropertyChange(() => Styling); }
         }
 
-		[JsonProperty("closed_beta_date")]
+		[JsonProperty("closed_beta_date"), JsonConverter(typeof(UnixDateTimeConverter))]
 		public DateTime ClosedBetaDate
 		{
 			get { return closedBetaDate; }
 			set { closedBetaDate = value; NotifyOfPropertyChange(() => ClosedBetaDate); }
 		}
 
-		[JsonProperty("open_beta_date")]
+    [JsonProperty("open_beta_date"), JsonConverter(typeof(UnixDateTimeConverter))]
 		public DateTime OpenBetaDate
 		{
 			get { return openBetaDate; }
 			set { openBetaDate = value; NotifyOfPropertyChange(() => OpenBetaDate); }
 		}
 
-		[JsonProperty("launch_date")]
+    [JsonProperty("launch_date"), JsonConverter(typeof(UnixDateTimeConverter))]
 		public DateTime LaunchDate
 		{
 			get { return launchDate; }

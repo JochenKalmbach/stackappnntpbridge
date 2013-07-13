@@ -44,98 +44,18 @@ namespace StackAppBridge
         {
           lblInfo.Text = "Server started.";
           cmdStart.Content = "Stop";
-          //StartWlidAutoRefresh();
         }
         else
         {
           lblInfo.Text = "Server stopped.";
           cmdStart.Content = "Start";
-          //StopWlidAutoRefresh();
         }
         RaisePropertyChanged("Started");
       }
     }
 
-    //#region WLID auto refresh
-
-    //private volatile Microsoft.Support.Community.CpsAuthHeaderBehavior _answersAuthHeader;
-
-    //private System.Threading.AutoResetEvent _cyclingWlidEndEvent;
-    //private System.Threading.Thread _cyclingWlidThread;
-    //void StartWlidAutoRefresh()
-    //{
-    //  if (_cyclingWlidEndEvent == null)
-    //  {
-    //    _cyclingWlidEndEvent = new AutoResetEvent(false);
-    //  }
-    //  _cyclingWlidEndEvent.Reset();  // Be sure the event is not set
-
-    //  // Start here a LiveId auto-refresh thread:
-    //  _cyclingWlidThread = new Thread(WlidAutoRefreshThread);
-    //  _cyclingWlidThread.IsBackground = true;
-    //  _cyclingWlidThread.Start();
-    //}
-    //void StopWlidAutoRefresh()
-    //{
-    //  _cyclingWlidEndEvent.Set();
-    //  _cyclingWlidThread.Join();
-    //  _cyclingWlidThread = null;
-    //}
-
-
-    //const string answerServiceName = "cpslite.community.services.support.microsoft.com";
-    //void WlidAutoRefreshThread()
-    //{
-    //  while (_cyclingWlidEndEvent.WaitOne(new TimeSpan(0, 57, 0)) == false)  // refresh every 57 minutes
-    //  {
-    //    var identity = PassportHelper.CurrentIdentity;
-    //    var authHeader = _answersAuthHeader;
-    //    if ((authHeader != null) && (identity != null))
-    //    {
-    //      Traces.Main_TraceEvent(TraceEventType.Verbose, 1, "LiveId: Try auto-re-authentication");
-    //      bool suceeded = false;
-    //      var authenticationData = new AuthenticationInformation();
-    //      try
-    //      {
-    //        suceeded = PassportHelper.ReAuthenticateSilent(identity, ref authenticationData,
-    //                                                       answerServiceName, "MBI",
-    //                                                       true);
-    //      }
-    //      catch (Exception exp)
-    //      {
-    //        Traces.Main_TraceEvent(TraceEventType.Error, 1, "LiveId: Re-Authenticate failed: {0}", NNTPServer.Traces.ExceptionToString(exp));
-    //      }
-    //      if (suceeded && (authenticationData.Ticket != null))
-    //      {
-    //        Traces.Main_TraceEvent(TraceEventType.Verbose, 1, "LiveId: Re-Authenticate: UserName: {0}, Ticket: {1}",
-    //                               authenticationData.UserName, authenticationData.Ticket);
-
-    //        // Set the ticket in the Answer-WebService:
-    //        authHeader.UpdateTicket(authenticationData.Ticket);
-
-    //        // Also store the data (lob) in the UserSettings
-    //        if (string.IsNullOrEmpty(UserSettings.Default.AuthenticationBlob) == false)
-    //        {
-    //          UserSettings.Default.AuthenticationBlob = authenticationData.AuthBlob;
-    //          UserSettings.Default.Save();
-    //        }
-    //      }
-    //      else
-    //      {
-    //        // Reset the auto login, if the authentication has failed...
-    //        Traces.Main_TraceEvent(TraceEventType.Error, 1, "Could not re-authenticate with LiveId!");
-    //        //UserSettings.Default.AuthenticationBlob = string.Empty;
-    //        //throw new ApplicationException("Could not authenticate with LiveId!");
-    //      } // identity != null
-    //    } // while
-    //  }
-    //}  // WlidAutoRefreshThread
-
-    //#endregion
-
     public MainWindow()
     {
-      //sMainWindow = this;
       InitializeComponent();
       this.DataContext = this;
 
@@ -291,7 +211,15 @@ namespace StackAppBridge
       {
         // Try to login....
         Traces.Main_TraceEvent(TraceEventType.Verbose, 1, "OAuth 2.0: Try authentication...");
-        var dlg = new AuthWindow();
+
+        var scopes = new List<string>();
+        scopes.Add("no_expiry");
+        if (UserSettings.Default.ShowInboxAndNotifications)
+        {
+          scopes.Add("read_inbox");
+        }
+
+        var dlg = new AuthWindow(scopes);
         //dlg.Owner = t;
         if (dlg.ShowDialog() == true)
         {

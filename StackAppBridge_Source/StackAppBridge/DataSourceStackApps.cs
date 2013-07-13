@@ -84,9 +84,6 @@ namespace StackAppBridge
           return true;
         }
 
-        // Add special "Inbox" newsgroup
-        AddStackExchangeInboxGroup(GroupList);
-
         // Use the newsgroup from the config
         foreach (NewsgroupConfigEntry entry in _NewsgroupConfig.Newsgroups)
         {
@@ -121,6 +118,9 @@ namespace StackAppBridge
             groupAction(g);
         }
 
+        // Add special "Inbox" newsgroup
+        AddStackExchangeInboxGroup();
+
         if (res)
           SetNewsgroupCacheValid();
       } // lock
@@ -128,15 +128,34 @@ namespace StackAppBridge
       return res;
     }
 
-    private void AddStackExchangeInboxGroup(Dictionary<string, Newsgroup> groupList)
+    private void AddStackExchangeInboxGroup()
     {
-      // TODO: Support of Inbox-Items...
+      // Support of Inbox-Items and Notifications...
       if (string.IsNullOrEmpty(_accessToken))
         return;
 
-      // INFO: This needs to have the "read_inbox" scope on the AuthWindow!
+      if (UserSettings.Default.ShowInboxAndNotifications)
+      {
+        lock (GroupList)
+        {
+          // Detect all Sites...
+          var sites = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+          foreach (ForumNewsgroup g in GroupList.Values)
+          {
+            if ( (sites.ContainsKey(g.Site) == false) && (string.IsNullOrEmpty(g.Site) == false))
+              sites.Add(g.Site, null);
+         }
 
-      //throw new NotImplementedException();
+          if (sites.Keys.Any())
+          {
+            var inboxGroup = new ForumNewsgroup(sites.Keys);
+            if (GroupList.ContainsKey(inboxGroup.GroupName) == false)
+            {
+              GroupList.Add(inboxGroup.GroupName, inboxGroup);
+            }
+          }
+        }
+      }
     }
 
     /// <summary>
@@ -233,6 +252,11 @@ namespace StackAppBridge
     {
       if (g == null)
         throw new ApplicationException("No group provided");
+
+      if (g.IsInboxGroup)
+      {
+        throw new NotImplementedException();
+      }
 
       long? id = ForumArticle.IdToPostId(articleId);
       if (id == null) return null;
@@ -353,6 +377,11 @@ namespace StackAppBridge
         }
       }
 
+      if (g.IsInboxGroup)
+      {
+        throw new NotImplementedException();
+      }
+
       IEnumerable<ForumArticle> a = _management.GetMessageStreamByMsgNo(g, new[] { articleNumber });
       if ((a == null) || (a.Any() == false)) return null;
       ForumArticle art = a.First();
@@ -407,6 +436,13 @@ namespace StackAppBridge
         firstArticle = g.FirstArticle;
       if (lastArticle > g.LastArticle)
         lastArticle = g.LastArticle;
+
+
+      if (g.IsInboxGroup)
+      {
+        throw new NotImplementedException();
+      }
+
 
       var missingArticles = new List<int>();
       for (int no = firstArticle; no <= lastArticle; no++)
@@ -479,6 +515,11 @@ namespace StackAppBridge
         protected override void SaveArticles(string clientUsername, List<Article> articles)
         {
           throw new ApplicationException("Currently not supported!");
+
+          // TODO: Leave comments to a question or answer (currently this is the only possible operation!):
+          //       /posts/{id}/comments/add 
+
+
           //foreach (var a in articles)
           //{
           //    var g = GetNewsgroupFromCacheOrServer(a.ParentNewsgroup) as ForumNewsgroup;
@@ -610,15 +651,34 @@ namespace StackAppBridge
     {
       internal const int DefaultMsgNumber = 1000;
 
+      private const string apiKey = "9aT4ZKsThCbBFlD5skBrEw((";
+
       public ForumNewsgroup(NewsgroupConfigEntry config)
-        : base(config.Name, 1, DefaultMsgNumber, true, DefaultMsgNumber, DateTime.Now)
+        : base(config.Name, 1, DefaultMsgNumber, false, DefaultMsgNumber, DateTime.Now)
       {
         _config = config;
         DisplayName = config.Name;
         Description = string.Format("Newsgroup from '{0}' with the tags: '{1}", config.Server, config.Tags);
 
-        StackyClient = new StackyClient("2.1", "9aT4ZKsThCbBFlD5skBrEw((", "https://api.stackexchange.com", new UrlClient(), new JsonProtocol());
+        StackyClient = new StackyClient("2.1", apiKey, "https://api.stackexchange.com", new UrlClient(), new JsonProtocol());
       }
+
+      /// <summary>
+      /// Special constructor for "Inbox" and "Notification" group!
+      /// </summary>
+      public ForumNewsgroup(IEnumerable<string> inboxSites)
+        : base("StackApps.InboxAndNotifications", 1, DefaultMsgNumber, false, DefaultMsgNumber, DateTime.Now)
+      {
+        IsInboxGroup = true;
+        InboxSites = inboxSites.ToArray();
+        DisplayName = this.GroupName;
+        Description = string.Format("Inbox and notification group");
+
+        StackyClient = new StackyClient("2.1", apiKey, "https://api.stackexchange.com", new UrlClient(), new JsonProtocol());
+      }
+
+      internal bool IsInboxGroup;
+      internal string[] InboxSites;
 
       private NewsgroupConfigEntry _config;
 
@@ -951,6 +1011,17 @@ namespace StackAppBridge
         // rersult list...
         var articles = new List<ForumArticle>();
 
+        if (group.IsInboxGroup)
+        {
+          foreach (string site in group.InboxSites)
+          {
+            var inboxItems = group.StackyClient.GetInboxItems(accessToken: _accessToken,
+                                                              _filter: ContentFilterNameWithBody, site_: site);
+            // TODO: Check if exists otherwise add...
+          }
+          throw new NotImplementedException();
+        }
+
         // First get the Msg# from the local mapping table:
         GetMaxMessageNumber(group);
 
@@ -960,7 +1031,6 @@ namespace StackAppBridge
         {
           // It is the first time, we are asking articles from this newsgroup
           // How many should be fetch?
-
           int page = 1;
           bool hasMore;
           var newArticles = new List<ForumArticle>();
