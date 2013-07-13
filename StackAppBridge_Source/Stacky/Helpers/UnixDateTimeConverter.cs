@@ -33,10 +33,11 @@ namespace Stacky
         /// <param name="serializer">The calling serializer.</param>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            long val;
+            long val = 0;
             if (value is DateTime)
             {
                 DateTime dateTime = (DateTime)value;
+              if (dateTime != DateTime.MinValue)
                 val = dateTime.ToUnixTime();
             }
             else

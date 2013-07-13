@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data.Objects;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -255,7 +256,7 @@ namespace StackAppBridge
 
       if (g.IsInboxGroup)
       {
-        throw new NotImplementedException();
+        return _management.GetInboxItemFromId(g, articleId);
       }
 
       long? id = ForumArticle.IdToPostId(articleId);
@@ -379,7 +380,7 @@ namespace StackAppBridge
 
       if (g.IsInboxGroup)
       {
-        throw new NotImplementedException();
+        return _management.GetInboxItemFromNumber(g, articleNumber);
       }
 
       IEnumerable<ForumArticle> a = _management.GetMessageStreamByMsgNo(g, new[] { articleNumber });
@@ -440,7 +441,44 @@ namespace StackAppBridge
 
       if (g.IsInboxGroup)
       {
-        throw new NotImplementedException();
+        for (int no = firstArticle; no <= lastArticle; no++)
+        {
+          Article a = null;
+          // Check if the article is in the cache...
+          if (UserSettings.Default.DisableArticleCache == false)
+          {
+            lock (g.Articles)
+            {
+              if (g.Articles.ContainsKey(no))
+                a = g.Articles[no];
+            }
+          }
+
+          if (a != null)
+          {
+            articlesProgressAction(new[] {a});
+          }
+          else
+          {
+            // Read article...
+            var article = _management.GetInboxItemFromNumber(g, no);
+            if (article != null)
+            {
+              ConvertNewArticleFromWebService(article);
+              if (UserSettings.Default.DisableArticleCache == false)
+              {
+                lock (g.Articles)
+                {
+                  if (g.Articles.ContainsKey(article.Number) == false)
+                    g.Articles[article.Number] = article;
+                }
+              }
+              // output the now fetched articles...
+              articlesProgressAction(new[] {article});
+            }
+          }
+        }  // for
+        return;
       }
 
 
@@ -879,13 +917,60 @@ namespace StackAppBridge
       private Question _question;
       private Comment _comment;
       private Answer _answer;
+      private InboxItem _inboxItem;
 #endif
 
-      //internal void UpdateParentId()
-      //{
-      //  if (MappingValue.ParentId != null)
-      //    References = GuidToId(MappingValue.ParentId.Value);
-      //}
+
+      public ForumArticle(ForumNewsgroup g, Mapping mapping, InboxItem inboxItem)
+        : base((int)mapping.NNTPMessageNumber)
+      {
+#if DEBUG
+        _inboxItem = inboxItem;
+#endif
+        Id = MappingToInboxId(mapping);
+
+        MappingValue = mapping;
+
+        DateTime dt = inboxItem.CreationDate;
+        Date = string.Format("{0} +0000", dt.ToString("ddd, d MMM yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture));
+
+        string author = null;
+
+        if (string.IsNullOrEmpty(inboxItem.ItemType) == false)
+        {
+          author = "INBOX-" + inboxItem.ItemType;
+        }
+        if (string.IsNullOrEmpty(author))
+          author = "INBOX-Unknown <null>";
+
+        From = author;
+        DisplayName = author;
+
+        Subject = mapping.Title;
+
+        Newsgroups = g.GroupName;
+        ParentNewsgroup = Newsgroups;
+        Path = "LOCALHOST.StackAppBridge";
+
+        var mhStr = new StringBuilder();
+        mhStr.Append("<br/>-----<br/>");
+        mhStr.Append("<strong>INBOX: ");
+        mhStr.Append(inboxItem.ItemType);
+        mhStr.Append("</strong>");
+        if (string.IsNullOrEmpty(inboxItem.Link) == false)
+          mhStr.AppendFormat("<br/>Link: <a href='{0}'>{0}</a>", inboxItem.Link);
+        if (inboxItem.CommentId != 0)
+          mhStr.AppendFormat("<br/>CommentId: {0}", inboxItem.CommentId);
+        if (inboxItem.AnswerId != 0)
+          mhStr.AppendFormat("<br/>AnswerId: {0}", inboxItem.AnswerId);
+        if (inboxItem.QuestionId != 0)
+          mhStr.AppendFormat("<br/>QuestionId: {0}", inboxItem.QuestionId);
+        if (inboxItem.CreationDate != DateTime.MinValue)
+          mhStr.AppendFormat("<br/>Created: {0:yyyy-MM-dd HH:mm:ss}", inboxItem.CreationDate);
+        mhStr.Append("<br/>-----<br/>");
+
+        Body = inboxItem.Body + mhStr;
+      }
 
       public Mapping MappingValue;
 
@@ -920,6 +1005,50 @@ namespace StackAppBridge
             return null;
 
           return idVal;
+        }
+
+
+        public const int InboxTypInboxItem = 0;
+        public const int InboxTypNotification = 1;
+        public static string MappingToInboxId(Mapping m)
+      {
+        string createdDateStr = m.CreatedDate == null
+                              ? "0"
+                              : m.CreatedDate.Value.ToString("yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture);
+        return "<"
+          + m.Id.ToString("D", System.Globalization.CultureInfo.InvariantCulture)
+          + "-"
+          + (m.PostType == InboxTypInboxItem ? "Inbox" : "Notify")
+          + "-"
+          + createdDateStr
+          + "@stackappnntpbridge.codeplex.com>";
+      }
+
+        public static Mapping IdToInboxMapping(string id)
+        {
+          if (id == null) return null;
+          if (id.StartsWith("<") == false) return null;
+          id = id.Trim('<', '>');
+          var parts = id.Split('-', '@');
+
+          // The first part is always the GUID:
+          Guid idVal;
+          if (Guid.TryParse(parts[0], out idVal) == false)
+            return null;
+
+          //DateTime? dtVal = null;
+          //try
+          //{
+          //  dtVal = DateTime.ParseExact(parts[1], "yyyyMMddHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal)
+          //}
+          //catch {}
+          //if (dtVal == null)
+          //  return null;
+
+          var m = new Mapping();
+          //m.CreatedDate = dtVal.Value;
+          m.Id = idVal;
+          return m;
         }
     }
 
@@ -1013,13 +1142,70 @@ namespace StackAppBridge
 
         if (group.IsInboxGroup)
         {
-          foreach (string site in group.InboxSites)
+          GetMaxMessageNumber(group);
+
+          var internalArticles = new List<ForumArticle>();
+          int maxNumber = group.LastArticle;
+          using (var con = _db.CreateConnection(group.GroupName))
           {
-            var inboxItems = group.StackyClient.GetInboxItems(accessToken: _accessToken,
-                                                              _filter: ContentFilterNameWithBody, site_: site);
-            // TODO: Check if exists otherwise add...
+            foreach (string site in group.InboxSites)
+            {
+              var inboxItems = group.StackyClient.GetInboxItems(accessToken: _accessToken,
+                                                                _filter: ContentFilterNameWithBody, site_: site);
+              foreach (InboxItem inboxItem in inboxItems)
+              {
+                DateTime cd = inboxItem.CreationDate;
+                var existing =
+                  con.Mappings.Where(
+                    p => p.CreatedDate == cd && p.PostType == ForumArticle.InboxTypInboxItem)
+                     .ToArray();
+                if (existing.Any(p => string.Equals(p.Title, inboxItem.Title, StringComparison.Ordinal)) == false)
+                {
+                  // It does not exist.. so add it...
+                  var map = new Mapping();
+                  map.Id = Guid.NewGuid();
+                  map.NNTPMessageNumber = ++maxNumber;
+                  map.PostId = map.NNTPMessageNumber;
+                  map.CreatedDate = inboxItem.CreationDate;
+                  map.Title = inboxItem.Title;
+
+                  // Reset alll unused items...
+                  inboxItem.Title = null;
+                  if (inboxItem.Site != null)
+                  {
+                    inboxItem.Site.Aliases = null;
+                    inboxItem.Site.ApiEndpoint = null;
+                    inboxItem.Site.ApiSiteParameter = null;
+                    inboxItem.Site.Audience = null;
+                    inboxItem.Site.ClosedBetaDate = DateTime.MinValue;
+                    inboxItem.Site.Description = null;
+                    inboxItem.Site.FaviconUrl = null;
+                    inboxItem.Site.IconUrl = null;
+                    inboxItem.Site.LaunchDate = DateTime.MinValue;
+                    inboxItem.Site.LogoUrl = null;
+                    inboxItem.Site.MarkdownExtensions = null;
+                    inboxItem.Site.OpenBetaDate = DateTime.MinValue;
+                    inboxItem.Site.SiteUrl = null;
+                    inboxItem.Site.Styling = null;
+                    inboxItem.Site.TwitterAccount = null;
+                    inboxItem.Site.Type = null;
+                  }
+                  map.Info = inboxItem.ToJson();
+                  con.Mappings.AddObject(map);
+
+                  internalArticles.Add(new ForumArticle(group, map, inboxItem));
+                }
+              }
+            }
+            if (internalArticles.Any())
+            {
+              con.SaveChanges(SaveOptions.None);
+            }
           }
-          throw new NotImplementedException();
+
+          GetMaxMessageNumber(group);
+
+          return internalArticles;
         }
 
         // First get the Msg# from the local mapping table:
@@ -1453,6 +1639,39 @@ namespace StackAppBridge
 
       return res;
      }
+
+    public ForumArticle GetInboxItemFromId(ForumNewsgroup group, string articleId)
+    {
+      using (var con = _db.CreateConnection(group.GroupName))
+      {
+        Mapping map1 = ForumArticle.IdToInboxMapping(articleId);
+
+        if (map1 != null)
+        {
+          Mapping map = con.Mappings.FirstOrDefault(p => p.Id == map1.Id);
+          if (map != null)
+          {
+            InboxItem inboxItem = InboxItem.FromJson(map.Info);
+            return new ForumArticle(group, map, inboxItem);
+          }
+        }
+        return null;
+      }
+    }
+
+    public ForumArticle GetInboxItemFromNumber(ForumNewsgroup group, int articleNumber)
+    {
+      using (var con = _db.CreateConnection(group.GroupName))
+      {
+        Mapping map = con.Mappings.FirstOrDefault(p => p.NNTPMessageNumber == articleNumber);
+        if (map != null)
+        {
+          InboxItem inboxItem = InboxItem.FromJson(map.Info);
+          return new ForumArticle(group, map, inboxItem);
+        }
+        return null;
+      }
+    }
   } // class MsgNumberManagement
 
 

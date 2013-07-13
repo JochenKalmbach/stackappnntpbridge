@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
@@ -12,6 +13,16 @@ namespace Stacky
   [JsonObject]
   public class InboxItem
   {
+    public string ToJson()
+    {
+      return JsonConvert.SerializeObject(this,
+        new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+    }
+    public static InboxItem FromJson(string text)
+    {
+      return JsonConvert.DeserializeObject<InboxItem>(text);
+    }
+
     [JsonProperty("answer_id")]
     public int AnswerId { get; set; }
 
