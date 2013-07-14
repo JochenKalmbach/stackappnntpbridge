@@ -1247,7 +1247,8 @@ namespace StackAppBridge
               p => p.CreatedDate == cd && p.PostType == ForumArticle.InboxTypNotification)
                .ToArray();
 
-          if ((existing.Any() == false) || (existing.Any(p => string.Equals(p.Title, NotifyTitle(notifyItem)) == false)))
+          if ((existing.Any() == false) || 
+            (existing.Any(p => string.Equals(p.Title, NotifyTitle(notifyItem), StringComparison.Ordinal)) == false))
           {
             // It does not exist.. so add it...
             var map = new Mapping();
