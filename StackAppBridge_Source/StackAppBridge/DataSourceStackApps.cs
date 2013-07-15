@@ -1394,7 +1394,12 @@ namespace StackAppBridge
       // Now, create a goood NNTP# and save it to the database...
       using (var con = _db.CreateConnection(group.GroupName))
       {
+        // Retrive the current maxNr:
         int maxNr = group.LastArticle;
+        if (con.Mappings.Any())
+        {
+          maxNr = (int) con.Mappings.Max(p => p.NNTPMessageNumber);
+        }
         foreach (ForumArticle article in newArticles)
         {
           // Suche, ob der Artikel schon vorhanden ist...
@@ -1700,47 +1705,63 @@ namespace StackAppBridge
         }
       
       // Now differentiate between Answer/Questions and Comments
-        Mapping[] questions = maps.Where(p => p.PostType == PostTypeQuestion).ToArray();
-      Mapping[] answers = maps.Where(p => p.PostType == PostTypeAnswer).ToArray();
-      Mapping[] comments = maps.Where(p => p.PostType == PostTypeComment).ToArray();
+        List<Mapping> questions = maps.Where(p => p.PostType == PostTypeQuestion).ToList();
+      List<Mapping> answers = maps.Where(p => p.PostType == PostTypeAnswer).ToList();
+      List<Mapping> comments = maps.Where(p => p.PostType == PostTypeComment).ToList();
 
 
       var res = new List<ForumArticle>();
 
       if (questions.Any())
       {
-        IPagedList<Question> result = group.StackyClient.GetQuestions(questions.Select(p => (int)p.PostId), _filter: ContentFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
-        LogPageResult(result, group.GroupName);
-        foreach (Question question in result)
+        IPagedList<Question> result;
+        do
         {
-          var map = questions.First(r => r.PostId == question.Id);
-          Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetQuestions: id:{0}", map.PostId);
-          res.Add(new ForumArticle(group, map, question));
-        }
+          result = group.StackyClient.GetQuestions(questions.Select(p => (int)p.PostId), _filter: ContentFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
+          LogPageResult(result, group.GroupName);
+          foreach (Question question in result)
+          {
+            var map = questions.First(r => r.PostId == question.Id);
+            Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetQuestions: id:{0}", map.PostId);
+            res.Add(new ForumArticle(group, map, question));
+          }
+          questions.RemoveRange(0, result.Count());
+        } while (result.HasMore && (questions.Count > 0));
+        
       }
 
       if (answers.Any())
       {
-        IPagedList<Answer> result = group.StackyClient.GetAnswers(answers.Select(p => (int)p.PostId), filter_: ContentFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
-        LogPageResult(result, group.GroupName);
-        foreach (Answer answer in result)
+        IPagedList<Answer> result;
+        do
         {
-          var map = answers.First(r => r.PostId == answer.Id);
-          Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetAnswers: id:{0}", map.PostId);
-          res.Add(new ForumArticle(group, map, answer));
-        }
+          result = group.StackyClient.GetAnswers(answers.Select(p => (int)p.PostId), filter_: ContentFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
+          LogPageResult(result, group.GroupName);
+          foreach (Answer answer in result)
+          {
+            var map = answers.First(r => r.PostId == answer.Id);
+            Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetAnswers: id:{0}", map.PostId);
+            res.Add(new ForumArticle(group, map, answer));
+          }
+          answers.RemoveRange(0, result.Count());
+        } while (result.HasMore && (answers.Count > 0));
       }
 
       if (comments.Any())
       {
-        IPagedList<Comment> result = group.StackyClient.GetComments(comments.Select(p => (int)p.PostId), filter_: ContentFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
-        LogPageResult(result, group.GroupName);
-        foreach (Comment comment in result)
+        IPagedList<Comment> result;
+        do
         {
-          var map = comments.First(r => r.PostId == comment.Id);
-          Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetComments: id:{0}", map.PostId);
-          res.Add(new ForumArticle(group, map, comment));
-        }
+          result = group.StackyClient.GetComments(comments.Select(p => (int)p.PostId), filter_: ContentFilterNameWithBody, site_: group.Site, accessToken: _accessToken);
+          LogPageResult(result, group.GroupName);
+          foreach (Comment comment in result)
+          {
+            var map = comments.First(r => r.PostId == comment.Id);
+            Traces.WebService_TraceEvent(TraceEventType.Information, 1, "GetComments: id:{0}", map.PostId);
+            res.Add(new ForumArticle(group, map, comment));
+          }
+          comments.RemoveRange(0, result.Count());
+        } while (result.HasMore && (comments.Count > 0));
       }
 
       // So, now sort the articles again (by NNTP Number)...
