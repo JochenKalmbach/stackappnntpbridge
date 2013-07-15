@@ -1774,6 +1774,23 @@ namespace StackAppBridge
           return 1;
         });
 
+      // Remove possible duplicates...
+      int idx = 0;
+      while (res.Count < (idx+1))
+      {
+        ForumArticle a = res[idx];
+        ForumArticle b = res[idx + 1];
+        if (a.Number == b.Number)
+        {
+          // duplicate, remove...
+          res.RemoveAt(idx+1);
+        }
+        else
+        {
+          idx++;
+        }
+      }
+
       return res;
      }
 

@@ -70,6 +70,8 @@ namespace StackAppBridge
             u._postsAreAlwaysFormatFlowed = this._postsAreAlwaysFormatFlowed;
             u._tabAsSpace = this._tabAsSpace;
           u.BasePath = this.BasePath;
+          u._disableArticleCache = this._disableArticleCache;
+          u._useCodeColorizer = this._useCodeColorizer;
 
           u.MessageInfos = this.MessageInfos;
           u.Newsgroups = this.Newsgroups.Clone();
@@ -206,6 +208,10 @@ namespace StackAppBridge
                     if (b.HasValue)
                       UseCodeColorizer = b.Value;
 
+                    b = GetBoolean(r, "DisableArticleCache");
+                    if (b.HasValue)
+                      DisableArticleCache = b.Value;
+
                   MessageInfoEnum? mie = GetEnum<MessageInfoEnum>(r, "MessageInfos");
                   if (mie.HasValue)
                     MessageInfos = mie.Value;
@@ -251,6 +257,8 @@ namespace StackAppBridge
                 SetInt32(r, "TabAsSpace", TabAsSpace);
 
                 SetBoolean(r, "UseCodeColorizer", UseCodeColorizer);
+
+                SetBoolean(r, "DisableArticleCache", DisableArticleCache);
 
                 SetEnum(r, "MessageInfos", MessageInfos);
               }
