@@ -1776,7 +1776,7 @@ namespace StackAppBridge
 
       // Remove possible duplicates...
       int idx = 0;
-      while (res.Count < (idx+1))
+      while (res.Count > (idx+1))
       {
         ForumArticle a = res[idx];
         ForumArticle b = res[idx + 1];
