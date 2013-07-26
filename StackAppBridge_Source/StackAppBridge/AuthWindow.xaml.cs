@@ -33,13 +33,14 @@ namespace StackAppBridge
     {
       _url = string.Format(baseUrl, string.Join(",", scopes));
       InitializeComponent();
+      MyBrowser.Navigated += WebBrowser_OnNavigated;
     }
 
     private string _url;
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
-      WebBrowser.Navigate(_url);
+      MyBrowser.Navigate(new Uri(_url, UriKind.Absolute));
     }
 
     private void WebBrowser_OnNavigated(object sender, NavigationEventArgs e)

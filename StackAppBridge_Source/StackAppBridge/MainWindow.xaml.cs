@@ -161,6 +161,35 @@ namespace StackAppBridge
       lblInfo.Text = "Starting server... please wait...";
       cmdStart.IsEnabled = false;
 
+      // First do authetntication in the "main" UI-thread!
+      if (UserSettings.Default.UseAuthentication)
+      {
+        // Try to login....
+        Traces.Main_TraceEvent(TraceEventType.Verbose, 1, "OAuth 2.0: Try authentication...");
+
+        var scopes = new List<string>();
+        scopes.Add("no_expiry");
+        if (UserSettings.Default.ShowInboxAndNotifications)
+        {
+          scopes.Add("read_inbox");
+        }
+
+        var dlg = new AuthWindow(scopes);
+        dlg.Owner = this;
+        if (dlg.ShowDialog() == true)
+        {
+          this._accessToken = dlg.AccessToken;
+        }
+        else
+        {
+          Traces.Main_TraceEvent(TraceEventType.Error, 1, string.Format(string.Format("Authentication failed: {0}", dlg.ErrorDescription)));
+          if (onFinishedCallback != null)
+            onFinishedCallback(false,
+                             "Could not authenticate with StackExchange! If you want to work without authentication, please disable autehntication in the User Settings (General|UserAuthentication)");
+          return;
+        }
+      }
+
       var thread = new System.Threading.Thread(
           delegate(object o)
           {
@@ -207,31 +236,6 @@ namespace StackAppBridge
 
     private static void StartBridgeInternal(MainWindow t, int port)
     {
-      if (UserSettings.Default.UseAuthentication)
-      {
-        // Try to login....
-        Traces.Main_TraceEvent(TraceEventType.Verbose, 1, "OAuth 2.0: Try authentication...");
-
-        var scopes = new List<string>();
-        scopes.Add("no_expiry");
-        if (UserSettings.Default.ShowInboxAndNotifications)
-        {
-          scopes.Add("read_inbox");
-        }
-
-        var dlg = new AuthWindow(scopes);
-        //dlg.Owner = t;
-        if (dlg.ShowDialog() == true)
-        {
-          t._accessToken = dlg.AccessToken;
-        }
-        else
-        {
-          Traces.Main_TraceEvent(TraceEventType.Error, 1, string.Format(string.Format("Authentication failed: {0}", dlg.ErrorDescription)));
-          throw new ApplicationException("Could not authenticate with StackExchange! If you want to work without authentication, please disable autehntication in the User Settings (General|UserAuthentication)");
-        }
-      }
-      
       // Create our DataSource for the forums
       Traces.Main_TraceEvent(TraceEventType.Verbose, 1, "Creating datasource for NNTP server");
       t._forumsDataSource = new DataSourceStackApps(t._accessToken);
